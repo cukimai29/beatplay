@@ -1,0 +1,18 @@
+[Unit]
+Description=BeatPlay Premium server (QRIS manual + notif Telegram)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=beatplay
+WorkingDirectory=/opt/beatplay/server
+EnvironmentFile=/etc/beatplay-premium.env
+ExecStart=/usr/bin/python3 -u premium_server.py --port 8080 --admin-token ${ADMIN_TOKEN} --public-base ${PUBLIC_BASE}
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

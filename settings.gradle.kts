@@ -1,0 +1,30 @@
+rootProject.name = "utaloom"
+
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+        google()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        exclusiveContent {
+            forRepository { maven("https://jitpack.io") }
+            filter {
+                includeGroup("com.github.MetrolistGroup.innertubex")
+            }
+        }
+        mavenCentral()
+        google()
+        maven("https://maven.aliyun.com/repository/public")
+        maven("https://jitpack.io")
+    }
+}
+
+include(":shared")
+include(":innertube")
+include(":app")
+

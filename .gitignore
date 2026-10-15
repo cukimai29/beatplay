@@ -1,0 +1,13 @@
+.gradle/
+build/
+.idea/
+*.iml
+local.properties
+.kotlin/
+# Premium server secrets & runtime data (jangan commit!)
+server/tripay_config.json
+server/orders.json
+server/premium_expiry.json
+server/proofs/
+__pycache__/
+*.pyc
