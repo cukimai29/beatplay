@@ -155,7 +155,7 @@ class FullscreenTest {
             DesktopWindows.showMini()
             var mini: ComposeWindow? = null
             await("Mini player window") { onEdt {
-                Window.getWindows().filterIsInstance<ComposeWindow>().firstOrNull { it.isShowing && it.title == "Utaloom Mini player" }?.also { mini = it } != null
+                Window.getWindows().filterIsInstance<ComposeWindow>().firstOrNull { it.isShowing && it.title == "BeatPlay Mini player" }?.also { mini = it } != null
             } }
             val smallPlayer = checkNotNull(mini)
             onEdt { smallPlayer.renderImmediately() }
@@ -165,7 +165,7 @@ class FullscreenTest {
             check(!Stores.settings.value.miniPlayerAlwaysOnTop)
             click(smallPlayer, "Always on top")
             await("Pin restores native always-on-top") { onEdt { smallPlayer.isAlwaysOnTop } }
-            click(smallPlayer, "Show Utaloom")
+            click(smallPlayer, "Show BeatPlay")
             check(Player.state.value == stopped) { "Mini player visibility/pin changes must not change playback or the queue" }
             onEdt { smallPlayer.dispatchEvent(WindowEvent(smallPlayer, WindowEvent.WINDOW_CLOSING)) }
             await("Closing mini leaves main window alive") { onEdt { !smallPlayer.isShowing && w.isShowing } }
