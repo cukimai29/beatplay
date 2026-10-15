@@ -61,6 +61,13 @@ fun PremiumSection() {
                         else "Iklan audio tiap ${s.adEveryNSongs} lagu. Upgrade untuk mendengar tanpa jeda.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (!s.isPremium) {
+                        val left = (s.adEveryNSongs - s.songsSinceAd).coerceAtLeast(0)
+                        Text(
+                            "Iklan berikutnya setelah $left lagu lagi.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             }
         }
@@ -81,7 +88,7 @@ fun PremiumSection() {
                     val r = PremiumRepository.refresh(email, server.trim())
                     msg = if (r.isSuccess && r.getOrNull() == true) "Premium aktif untuk $email."
                     else if (r.isSuccess) "$email belum premium."
-                    else "Gagal cek: ${r.exceptionOrNull()?.message}"
+                    else "Gagal cek: ${r.exceptionOrNull()?.message ?: r.exceptionOrNull()?.javaClass?.simpleName ?: "?"}"
                     busy = false
                 }
             }, enabled = !busy && isValidEmail(email)) { Text(if (busy) "Mengecek…" else "Cek status") }

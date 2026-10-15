@@ -129,7 +129,7 @@ data class Settings(
     val isPremium: Boolean = false,
     val premiumLastChecked: Long = 0L,
     val premiumExpiry: Long? = null, // epoch detik dari server; null = lifetime/manual
-    val premiumServerUrl: String = "http://127.0.0.1:8080",
+    val premiumServerUrl: String = "http://52.141.21.195:8080",
     val premiumDevMode: Boolean = false, // tampilkan opsi developer di layar Premium
     val songsSinceAd: Int = 0,
     val adEveryNSongs: Int = 3,
