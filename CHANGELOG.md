@@ -1,5 +1,10 @@
 # Changelog
 
+## [v1.5.1] - 2026-10-15
+
+* Rilis patch 1.5.1 (b0fd666)
+* Default server VPS + penghitung iklan + pesan error jelas (e1784d5)
+
 ## [v1.5.0] - 2026-10-15
 
 * Perbaiki race push CHANGELOG di workflow Release (2224a78)
