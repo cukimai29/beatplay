@@ -111,7 +111,7 @@ jobs:
         with:
           tag_name: ${{ needs.version.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          name: Utaloom ${{ needs.version.outputs.tag }}
+          name: BeatPlay ${{ needs.version.outputs.tag }}
           files: dist/**/*
           body_path: release-notes.md
           make_latest: true
