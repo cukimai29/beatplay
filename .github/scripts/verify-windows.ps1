@@ -43,21 +43,24 @@ $regHives = @(
 )
 
 $installDir = $null
+$appName = $null
 foreach ($hive in $regHives) {
     if (Test-Path $hive) {
         $subkeys = @(Get-ChildItem -Path $hive -ErrorAction SilentlyContinue)
         foreach ($sub in $subkeys) {
             $displayName = $sub.GetValue("DisplayName")
-            if ($displayName -and $displayName -like "*utaloom*") {
+            if ($displayName -and ($displayName -like "*beatplay*" -or $displayName -like "*utaloom*")) {
                 Write-Host "Found registry entry '$displayName' at $($sub.PSPath)"
                 $loc = $sub.GetValue("InstallLocation")
                 if ($loc -and (Test-Path $loc)) {
                     $installDir = $loc
+                    $appName = if ($displayName -like "*beatplay*") { "beatplay" } else { "utaloom" }
                     break
                 }
                 $displayIcon = $sub.GetValue("DisplayIcon")
                 if ($displayIcon -and (Test-Path $displayIcon)) {
                     $installDir = Split-Path $displayIcon -Parent
+                    $appName = if ($displayName -like "*beatplay*") { "beatplay" } else { "utaloom" }
                     break
                 }
             }
@@ -68,30 +71,41 @@ foreach ($hive in $regHives) {
 
 if (-not $installDir) {
     $fallbackPaths = @()
-    if ($env:LOCALAPPDATA) { $fallbackPaths += (Join-Path $env:LOCALAPPDATA "utaloom") }
-    if ($env:ProgramFiles) { $fallbackPaths += (Join-Path $env:ProgramFiles "utaloom") }
-    if (${env:ProgramFiles(x86)}) { $fallbackPaths += (Join-Path ${env:ProgramFiles(x86)} "utaloom") }
+    if ($env:LOCALAPPDATA) {
+        $fallbackPaths += (Join-Path $env:LOCALAPPDATA "beatplay")
+        $fallbackPaths += (Join-Path $env:LOCALAPPDATA "utaloom")
+    }
+    if ($env:ProgramFiles) {
+        $fallbackPaths += (Join-Path $env:ProgramFiles "beatplay")
+        $fallbackPaths += (Join-Path $env:ProgramFiles "utaloom")
+    }
+    if (${env:ProgramFiles(x86)}) {
+        $fallbackPaths += (Join-Path ${env:ProgramFiles(x86)} "beatplay")
+        $fallbackPaths += (Join-Path ${env:ProgramFiles(x86)} "utaloom")
+    }
     foreach ($cand in $fallbackPaths) {
         if ($cand -and (Test-Path $cand)) {
             Write-Host "Resolved installation from fallback path: $cand"
             $installDir = $cand
+            $appName = Split-Path $cand -Leaf
             break
         }
     }
 }
 
 if (-not $installDir -or -not (Test-Path $installDir)) {
-    throw "Could not determine utaloom installation directory from registry or default paths."
+    throw "Could not determine BeatPlay installation directory from registry or default paths."
 }
-Write-Host "Target install directory: $installDir"
+if (-not $appName) { $appName = "beatplay" }
+Write-Host "Target install directory: $installDir (app: $appName)"
 
-$exePath = Join-Path $installDir "utaloom.exe"
+$exePath = Join-Path $installDir "$appName.exe"
 if (-not (Test-Path $exePath)) {
-    $foundExes = @(Get-ChildItem -Path $installDir -Filter "utaloom.exe" -Recurse -File -Depth 2 -ErrorAction SilentlyContinue)
+    $foundExes = @(Get-ChildItem -Path $installDir -Filter "$appName.exe" -Recurse -File -Depth 2 -ErrorAction SilentlyContinue)
     if ($foundExes -and $foundExes.Count -gt 0) {
         $exePath = $foundExes[0].FullName
     } else {
-        throw "utaloom.exe not found under $installDir"
+        throw "$appName.exe not found under $installDir"
     }
 }
 Write-Host "Target executable: $exePath"
@@ -105,9 +119,9 @@ if ($systemJava) {
 }
 
 $bundledRuntimeDir = Join-Path $installDir "runtime"
-$bundledCfg = Join-Path $installDir "app\utaloom.cfg"
+$bundledCfg = Join-Path $installDir "app\$appName.cfg"
 if (-not (Test-Path $bundledCfg)) {
-    $bundledCfg = Join-Path $installDir "utaloom.cfg"
+    $bundledCfg = Join-Path $installDir "$appName.cfg"
 }
 $hasBundledRuntime = (Test-Path $bundledRuntimeDir) -or (Test-Path $bundledCfg)
 if (-not $hasBundledRuntime) {
@@ -213,10 +227,10 @@ Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.Windows.Forms
 
 # 7. Start actual installed .exe (not portable app)
-$stdoutLog = Join-Path $artifactDir "utaloom-stdout.log"
-$stderrLog = Join-Path $artifactDir "utaloom-stderr.log"
+$stdoutLog = Join-Path $artifactDir "beatplay-stdout.log"
+$stderrLog = Join-Path $artifactDir "beatplay-stderr.log"
 
-Write-Host "Launching installed utaloom application..."
+Write-Host "Launching installed $appName application..."
 $proc = Start-Process -FilePath $exePath -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog -PassThru
 
 # 8. Wait for real MainWindowHandle with timeout and process exit check
@@ -227,7 +241,7 @@ $hwnd = [IntPtr]::Zero
 while ($stopwatch.Elapsed.TotalSeconds -lt $launchTimeoutSeconds) {
     if ($proc.HasExited) {
         $errOut = if (Test-Path $stderrLog) { Get-Content -Path $stderrLog -Raw } else { "" }
-        throw "utaloom.exe exited prematurely with code $($proc.ExitCode). Stderr: $errOut"
+        throw "$appName.exe exited prematurely with code $($proc.ExitCode). Stderr: $errOut"
     }
 
     $proc.Refresh()
@@ -236,6 +250,12 @@ while ($stopwatch.Elapsed.TotalSeconds -lt $launchTimeoutSeconds) {
         break
     }
 
+    $cand = [UtaloomWin32]::FindWindowForProcess($proc.Id, "BeatPlay")
+    if ($cand -ne [IntPtr]::Zero) {
+        $hwnd = $cand
+        break
+    }
+    # Fallback for upgrade installs still carrying the old product name.
     $cand = [UtaloomWin32]::FindWindowForProcess($proc.Id, "Utaloom")
     if ($cand -ne [IntPtr]::Zero) {
         $hwnd = $cand
@@ -268,7 +288,7 @@ try {
     if ($jvmMod) {
         Write-Host "Loaded jvm.dll: $($jvmMod.FileName)"
         if (-not $jvmMod.FileName.StartsWith($installDir, [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "utaloom.exe loaded jvm.dll from '$($jvmMod.FileName)', expected bundled runtime in '$installDir'"
+            throw "$appName.exe loaded jvm.dll from '$($jvmMod.FileName)', expected bundled runtime in '$installDir'"
         }
         Write-Host "Verified: jvm.dll loaded from bundled runtime; system Java on PATH was ignored."
     } else {
@@ -278,7 +298,7 @@ try {
     Write-Warning "Process module enumeration skipped: $_"
 }
 
-# 10. Assert window title is Utaloom and dimensions are >= 900x600
+# 10. Assert window title is BeatPlay and dimensions are >= 900x600
 if ($hwnd -ne [IntPtr]::Zero) {
     $title = [UtaloomWin32]::GetText($hwnd)
     if ([string]::IsNullOrWhiteSpace($title)) {
@@ -286,8 +306,8 @@ if ($hwnd -ne [IntPtr]::Zero) {
         $title = $proc.MainWindowTitle
     }
     Write-Host "Detected window title: '$title'"
-    if ($title -ne "Utaloom" -and $title -notmatch "Utaloom") {
-        throw "Expected window title to match 'Utaloom', got '$title'"
+    if ($title -ne "BeatPlay" -and $title -notmatch "BeatPlay" -and $title -notmatch "Utaloom") {
+        throw "Expected window title to match 'BeatPlay', got '$title'"
     }
 
     $rect = New-Object UtaloomWin32+RECT
@@ -298,7 +318,7 @@ if ($hwnd -ne [IntPtr]::Zero) {
     }
 
     # 11. Capture screenshot and verify distinct nonblank rendered pixels
-    $screenshotPath = Join-Path $artifactDir "utaloom-window.png"
+    $screenshotPath = Join-Path $artifactDir "beatplay-window.png"
     try {
         $screenWidth = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width
         $screenHeight = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Height
@@ -335,7 +355,7 @@ while (-not $proc.HasExited -and $closeWatch.Elapsed.TotalSeconds -lt $closeTime
 }
 
 if (-not $proc.HasExited) {
-    Write-Warning "Force-stopping utaloom after $closeTimeout seconds."
+    Write-Warning "Force-stopping $appName after $closeTimeout seconds."
     Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
 }
 Write-Host "Process terminated successfully."
