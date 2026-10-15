@@ -9,5 +9,6 @@ server/tripay_config.json
 server/orders.json
 server/premium_expiry.json
 server/proofs/
+server/__test_tmp/
 __pycache__/
 *.pyc
