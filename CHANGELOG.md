@@ -1,5 +1,14 @@
 # Changelog
 
+## [v1.5.0] - 2026-10-15
+
+* Perbaiki race push CHANGELOG di workflow Release (2224a78)
+* Samakan nama artefak dan rilis ke BeatPlay (54fd493)
+* Samakan verify-windows dengan nama BeatPlay (26110a6)
+* Perbaiki FullscreenTest setelah rebrand judul (f6cb1fa)
+* Bersihkan file tes lokal dari repo (e89535c)
+* BeatPlay 1.5.0: rebrand + premium + video ads (0a67a18)
+
 ## [v1.4.0] - 2026-10-11
 
 ### Added
