@@ -4,105 +4,118 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BeatPlay — Musik favoritmu. Dengan caramu.</title>
-<meta name="description" content="BeatPlay: YouTube Music client untuk Windows, Linux, dan Android. Lirik sinkron, offline, Listen Together, dan Premium Rp20rb/bln.">
+<meta name="description" content="BeatPlay: pemutar YouTube Music untuk Windows, Linux, dan Android. Lirik sinkron, offline, Listen Together, dan Premium.">
 <link rel="icon" href="img/logo.png">
 <style>
-:root{--bg:#0a0f1e;--card:#131a2e;--line:#26314d;--txt:#e8ecf5;--mut:#9aa4bf;--pink:#f471d6;--cyan:#38e1ff;--green:#3ddc84}
+:root{--bg:#ffffff;--soft:#f4f5f7;--txt:#1a1d24;--mut:#5b6270;--line:#e3e6ec;--acc:#4338ca;--acc-d:#3730a3}
 *{box-sizing:border-box}html{scroll-behavior:smooth}
-body{margin:0;color:var(--txt);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:radial-gradient(1100px 520px at 50% -8%,#1c2650 0%,var(--bg) 62%) fixed,var(--bg)}
-a{color:var(--cyan);text-decoration:none}
-.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
-nav{position:sticky;top:0;z-index:10;backdrop-filter:blur(12px);background:#0a0f1ecc;border-bottom:1px solid var(--line)}
-nav .wrap{display:flex;align-items:center;gap:14px;padding:12px 20px}
+body{margin:0;color:var(--txt);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);line-height:1.6}
+a{color:var(--acc)}
+.wrap{max-width:1060px;margin:0 auto;padding:0 20px}
+nav{position:sticky;top:0;z-index:10;background:#ffffffee;backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;align-items:center;gap:16px;padding:12px 20px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;color:var(--txt)}
-.brand img{width:34px;height:34px;border-radius:10px}
-.grad{background:linear-gradient(90deg,var(--cyan),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand img{width:32px;height:32px;border-radius:8px}
 nav .sp{flex:1}
-.btn{display:inline-block;border:none;border-radius:12px;padding:12px 26px;font-size:15px;font-weight:700;cursor:pointer;background:linear-gradient(90deg,#1f9df0,#7b5cff);color:#fff}
-.btn.ghost{background:#0b1124;color:var(--txt);border:1px solid var(--line)}
-.btn:hover{filter:brightness(1.12)}
-.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:34px;align-items:center;padding:64px 0 40px}
-.hero h1{font-size:clamp(34px,5vw,58px);line-height:1.08;margin:0 0 16px}
-.hero p{color:var(--mut);font-size:17px;line-height:1.6;margin:0 0 24px}
+nav .links a{color:var(--mut);margin-right:18px;font-size:14px}
+.btn{display:inline-block;border-radius:10px;padding:12px 26px;font-size:15px;font-weight:700;background:var(--acc);color:#fff;border:1px solid var(--acc)}
+.btn:hover{background:var(--acc-d)}
+.btn.ghost{background:#fff;color:var(--txt);border:1px solid var(--line)}
+.hero{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center;padding:64px 0 56px}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:2px;color:var(--acc);margin:0 0 10px}
+.hero h1{font-size:clamp(32px,4.6vw,52px);line-height:1.12;margin:0 0 16px}
+.hero p{color:var(--mut);font-size:17px;margin:0 0 24px}
 .hero .cta{display:flex;gap:12px;flex-wrap:wrap}
-.hero img.shot{width:100%;border-radius:20px;border:1px solid var(--line);box-shadow:0 24px 70px #000a}
-.platforms{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
-.pill{border:1px solid var(--line);border-radius:99px;padding:7px 16px;font-size:13px;color:var(--txt);background:#0b1124}
-section{padding:44px 0}
-.kicker{color:var(--cyan);font-weight:700;letter-spacing:2px;font-size:12px;margin:0 0 8px}
-h2.sec{font-size:clamp(26px,3.6vw,38px);margin:0 0 10px;line-height:1.2}
-.sub{color:var(--mut);max-width:640px;line-height:1.6}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:26px}
-.card{background:linear-gradient(180deg,#151d33,#0f1528);border:1px solid var(--line);border-radius:18px;padding:22px}
-.card .ic{font-size:30px}
-.card h3{margin:12px 0 8px;font-size:17px}
-.card p{margin:0;color:var(--mut);font-size:14px;line-height:1.6}
+.hero img{width:100%;border-radius:14px;border:1px solid var(--line);box-shadow:0 16px 44px #11131822}
+.platforms{margin-top:16px;font-size:14px;color:var(--mut)}
+section{padding:52px 0}
+section.alt{background:var(--soft)}
+h2.sec{font-size:clamp(24px,3.2vw,34px);line-height:1.25;margin:0 0 10px}
+.sub{color:var(--mut);max-width:640px;margin:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;margin-top:28px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px}
+.card h3{margin:0 0 8px;font-size:16px}
+.card p{margin:0;color:var(--mut);font-size:14px}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center;margin-top:8px}
+.split img{width:100%;border-radius:14px;border:1px solid var(--line)}
+.band{background:var(--txt);color:#fff;text-align:center;padding:30px 20px;font-size:clamp(18px,2.6vw,26px);font-weight:700}
 .shots{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:26px}
-.shots figure{margin:0;background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.shots figure{margin:0;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .shots img{width:100%;display:block}
-.shots figcaption{padding:10px 14px;font-size:13px;color:var(--mut)}
-.price{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}
-.plan{flex:1;min-width:200px;background:linear-gradient(180deg,#151d33,#0f1528);border:1px solid var(--line);border-radius:18px;padding:22px;text-align:center}
-.plan.hot{border-color:var(--pink);box-shadow:0 0 34px #f471d633}
+.shots figcaption{padding:10px 14px;font-size:13px;color:var(--mut);border-top:1px solid var(--line)}
+.price{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-top:26px}
+.plan{background:#fff;border:1px solid var(--line);border-radius:14px;padding:24px;text-align:center}
+.plan.hot{border:2px solid var(--acc)}
 .plan .p{font-size:30px;font-weight:800;margin:8px 0}
 .plan .t{color:var(--mut);font-size:14px}
 .dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:26px}
-.step{background:#0b1124;border:1px solid var(--line);border-radius:14px;padding:16px;font-size:14px;color:var(--mut);line-height:1.7}
+.step{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;font-size:14px;color:var(--mut)}
 .step b{color:var(--txt)}
-code{background:#0b1124;border:1px solid var(--line);border-radius:6px;padding:1px 8px;font-size:13px}
-footer{border-top:1px solid var(--line);margin-top:30px;padding:26px 0 46px;color:var(--mut);font-size:13px;text-align:center}
-@media(max-width:820px){.hero{grid-template-columns:1fr;padding-top:40px}}
+code{background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:1px 8px;font-size:13px}
+footer{border-top:1px solid var(--line);padding:26px 0 44px;color:var(--mut);font-size:13px;text-align:center}
+@media(max-width:820px){.hero,.split{grid-template-columns:1fr}nav .links{display:none}}
 </style>
 </head>
 <body>
 <nav><div class="wrap">
-<a class="brand" href="#"><img src="img/logo.png" alt="BeatPlay">Beat<span class="grad">Play</span></a>
+<a class="brand" href="#"><img src="img/logo.png" alt="BeatPlay">BeatPlay</a>
 <span class="sp"></span>
-<a href="#fitur">Fitur</a>&nbsp;&nbsp;<a href="#premium">Premium</a>&nbsp;&nbsp;<a href="#download" class="btn" style="padding:9px 20px">Download</a>
+<span class="links"><a href="#fitur">Fitur</a><a href="#tampilan">Tampilan</a><a href="#premium">Premium</a></span>
+<a class="btn" style="padding:9px 20px" href="#download">Download</a>
 </div></nav>
 
 <div class="wrap">
 <header class="hero">
 <div>
-<h1>Musik favoritmu.<br>Dengan <span class="grad">caramu</span>.</h1>
-<p> Satu ruang untuk semua lagu yang kamu suka. Lirik yang mengikuti tiap kata, download offline, dengar bareng teman — indah di desktop, nyaman di genggaman.</p>
+<p class="eyebrow">PEMUTAR MUSIK UNTUK WINDOWS, LINUX &amp; ANDROID</p>
+<h1>Musik favoritmu.<br>Dengan caramu.</h1>
+<p>Satu ruang untuk semua lagu yang kamu suka. Indah di desktop. Nyaman di genggaman.</p>
 <div class="cta">
-<a class="btn" href="#download">Download BeatPlay</a>
+<a class="btn" href="download.html">Download BeatPlay</a>
 <a class="btn ghost" href="#tampilan">Intip tampilannya</a>
 </div>
-<div class="platforms"><span class="pill">Windows</span><span class="pill">Linux</span><span class="pill">Android</span></div>
+<p class="platforms">Tersedia untuk <b>Windows</b> / <b>Linux</b> / <b>Android</b></p>
 </div>
-<img class="shot" src="img/lyrics-fullscreen.png" alt="Player BeatPlay dengan lirik sinkron">
+<img src="img/lyrics-fullscreen.png" alt="Player BeatPlay dengan lirik sinkron">
 </header>
+</div>
 
+<div class="band">Setiap kata. Setiap perasaan.</div>
+
+<div class="wrap">
 <section id="fitur">
-<p class="kicker">LEBIH DEKAT DENGAN MUSIK</p>
-<h2 class="sec">Hal kecil.<br>Rasa yang berbeda.</h2>
-<p class="sub">Semua yang kamu butuhkan untuk larut dalam musik. Tanpa kerumitan.</p>
+<div class="split">
+<div>
+<p class="eyebrow">LIRIK TERSINKRON</p>
+<h2 class="sec">Bukan hanya mendengar.<br>Ikut merasakan.</h2>
+<p class="sub">Lirik mengikuti setiap kata yang dinyanyikan, gaya karaoke. Untuk bagian yang ingin kamu ulang lagi.</p>
+</div>
+<img src="img/artist-lyrics.png" alt="Halaman artis dengan panel lirik">
+</div>
 <div class="grid">
-<div class="card"><div class="ic">🎤</div><h3>Lirik sinkron kata-per-kata</h3><p>Lirik mengikuti setiap kata yang dinyanyikan, gaya karaoke. Untuk bagian yang ingin kamu ulang lagi.</p></div>
-<div class="card"><div class="ic">📴</div><h3>Offline, tetap jalan</h3><p>Download lagu favorit. Tetap dengarkan di perjalanan, bahkan tanpa koneksi.</p></div>
-<div class="card"><div class="ic">👥</div><h3>Listen Together</h3><p>Buat room, bagikan kodenya, dan dengarkan musik secara sinkron bersama teman.</p></div>
-<div class="card"><div class="ic">🎨</div><h3>Tema dinamis</h3><p>Warna aplikasi mengikuti artwork album. Terang ke gelap, selalu terasa pas.</p></div>
+<div class="card"><h3>📴 Offline, tetap jalan</h3><p>Simpan lagu favorit. Tetap dengarkan di perjalanan, bahkan tanpa koneksi.</p></div>
+<div class="card"><h3>👥 Listen Together</h3><p>Buat room, bagikan kodenya, dan dengarkan musik secara sinkron bersama teman.</p></div>
+<div class="card"><h3>🎨 Tema dinamis</h3><p>Warna aplikasi mengikuti artwork album. Dari terang ke gelap, selalu terasa pas.</p></div>
+<div class="card"><h3>🚫 Bebas iklan (Premium)</h3><p>Akun gratis mendengar iklan tiap 3 lagu. Premium menghapus semuanya.</p></div>
 </div>
 </section>
 
 <section id="tampilan">
-<p class="kicker">TAMPILAN ASLI APLIKASI</p>
+<p class="eyebrow">TAMPILAN ASLI APLIKASI</p>
 <h2 class="sec">Terlihat bagus.<br>Terasa lebih bagus.</h2>
+<p class="sub">Layar lebih luas. Musik lebih leluasa.</p>
 <div class="shots">
-<figure><img src="img/home.png" alt="Home BeatPlay"><figcaption>Home — rekomendasi & playlist</figcaption></figure>
-<figure><img src="img/explore.png" alt="Explore BeatPlay"><figcaption>Explore — rilisan & chart</figcaption></figure>
+<figure><img src="img/home.png" alt="Home BeatPlay"><figcaption>Home — rekomendasi &amp; playlist</figcaption></figure>
+<figure><img src="img/explore.png" alt="Explore BeatPlay"><figcaption>Explore — rilisan &amp; chart</figcaption></figure>
 <figure><img src="img/search.png" alt="Search BeatPlay"><figcaption>Search — lagu, album, artis</figcaption></figure>
-<figure><img src="img/artist-lyrics.png" alt="Artis BeatPlay"><figcaption>Artis + panel lirik</figcaption></figure>
 <figure><img src="img/queue.png" alt="Antrean BeatPlay"><figcaption>Antrean putar</figcaption></figure>
 </div>
 </section>
 
 <section id="premium">
-<p class="kicker">BEATPLAY PREMIUM</p>
+<p class="eyebrow">BEATPLAY PREMIUM</p>
 <h2 class="sec">Tanpa iklan.<br>Tanpa jeda.</h2>
-<p class="sub">Akun gratis mendengar iklan tiap 3 lagu. Premium menghapus semuanya. Bayar via QRIS, kirim bukti dari aplikasi, admin verifikasi — akun otomatis premium.</p>
+<p class="sub">Bayar via QRIS, kirim bukti dari aplikasi, admin verifikasi — akun otomatis premium.</p>
 <div class="price">
 <div class="plan"><div class="t">1 bulan</div><div class="p">Rp20rb</div><div class="t">30 hari penuh</div></div>
 <div class="plan hot"><div class="t">3 bulan · hemat</div><div class="p">Rp55rb</div><div class="t">90 hari penuh</div></div>
@@ -111,14 +124,14 @@ footer{border-top:1px solid var(--line);margin-top:30px;padding:26px 0 46px;colo
 </section>
 
 <section id="download">
-<p class="kicker">MULAI SEKARANG</p>
+<p class="eyebrow">MULAI SEKARANG</p>
 <h2 class="sec">Tekan play.<br>Jadi dirimu.</h2>
 <div class="dl">
-<div class="card"><h3>🖥️ Windows</h3><p>Installer .msi (VLC sudah di dalam, tanpa setting tambahan).</p><p><a class="btn" href="https://github.com/cukimai29/beatplay/releases">Download untuk Windows</a></p></div>
-<div class="card"><h3>🐧 Linux</h3><p>Paket .deb / .rpm + portable. Butuh VLC dari package manager.</p><p><a class="btn" href="https://github.com/cukimai29/beatplay/releases">Download untuk Linux</a></p></div>
-<div class="card"><h3>📱 Android</h3><p>APK langsung, tanpa Play Store. Izinkan install dari sumber tak dikenal.</p><p><!-- GANTI href di bawah dengan link MediaFire APK kamu --><a class="btn" href="#">Download untuk Android</a></p></div>
+<div class="card"><h3>Windows</h3><p>Installer .msi, VLC sudah di dalam.</p><p><a class="btn" href="download.html?platform=windows">Download Windows</a></p></div>
+<div class="card"><h3>Linux</h3><p>Paket .deb / .rpm + portable.</p><p><a class="btn" href="download.html?platform=linux">Download Linux</a></p></div>
+<div class="card"><h3>Android</h3><p>APK langsung. Izinkan install dari sumber tak dikenal.</p><p><a class="btn" href="download.html?platform=android">Download Android</a></p></div>
 </div>
-<div class="step" style="margin-top:16px"><b>Habis install (semua platform):</b> buka layar <b>Premium</b> → isi Server Premium dari admin → isi email → Cek status. Untuk akun YouTube sendiri: Settings → akun → Sign in dengan cookie (cukup sekali).</div>
+<div class="step" style="margin-top:16px"><b>Habis install:</b> buka layar <b>Premium</b> → isi Server Premium dari admin → isi email → Cek status. Untuk akun YouTube sendiri: Settings → akun → Sign in (cukup sekali).</div>
 </section>
 </div>
 
