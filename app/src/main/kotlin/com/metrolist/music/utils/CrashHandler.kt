@@ -26,6 +26,11 @@ class CrashHandler private constructor(
         try {
             val crashLog = buildCrashLog(throwable)
             Timber.e(throwable, "App crashed")
+            // Keep the last crash on disk so the user can share it even if the
+            // crash screen cannot be launched in time.
+            runCatching {
+                java.io.File(applicationContext.filesDir, "last_crash.txt").writeText(crashLog)
+            }
             
             // Launch crash activity
             val intent = Intent(applicationContext, CrashActivity::class.java).apply {
@@ -50,7 +55,7 @@ class CrashHandler private constructor(
         }.toString()
 
         return buildString {
-            appendLine("Utaloom Android Crash Report")
+            appendLine("BeatPlay Crash Report")
             appendLine("=".repeat(50))
             appendLine()
             appendLine("Manufacturer: ${Build.MANUFACTURER}")

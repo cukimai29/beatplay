@@ -435,6 +435,7 @@ class PlayerConnection(
 
     fun seekToNext() {
         try {
+            if (com.metrolist.music.premium.AdState.isShowing()) return
             // When casting, use Cast skip instead of local player
             val castHandler = service.castConnectionHandler
             if (castHandler?.isCasting?.value == true) {
@@ -456,6 +457,7 @@ class PlayerConnection(
 
     fun seekToPrevious() {
         try {
+            if (com.metrolist.music.premium.AdState.isShowing()) return
             // When casting, use Cast skip instead of local player
             val castHandler = service.castConnectionHandler
             if (castHandler?.isCasting?.value == true) {

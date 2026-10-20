@@ -13,9 +13,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStore
 import com.metrolist.music.extensions.toEnum
 import kotlinx.coroutines.Dispatchers
@@ -42,7 +44,11 @@ val Context.dataStore: DataStore<Preferences>
             // deep sleep, causing IOException in FileStorageConnection.writeScope()
             // that crashes the process and triggers a soft reboot.
             File(filesDir, "datastore").mkdirs()
-            return preferencesDataStore(name = "settings")
+            return preferencesDataStore(
+                name = "settings",
+                // A truncated preferences file must not turn every launch into a crash loop.
+                corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+            )
                 .getValue(this, ::dataStore)
                 .also { dataStoreInstance = it }
         }

@@ -43,6 +43,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
@@ -209,6 +210,24 @@ import com.metrolist.music.playback.queues.YouTubeQueue
 import com.metrolist.music.playback.queues.YouTubePlaylistQueue
 import com.metrolist.music.playback.queues.filterExplicit
 import com.metrolist.music.playback.queues.filterVideoSongs
+import com.metrolist.music.premium.AdDecision
+import com.metrolist.music.premium.AdGate
+import com.metrolist.music.premium.AdState
+import com.metrolist.music.premium.PremiumSnapshot
+import com.metrolist.music.premium.recordSongPlayedForAds
+import com.metrolist.music.premium.resetAdCounter
+import com.metrolist.music.premium.setSongsSinceAd
+import com.metrolist.music.constants.AdEveryNSongsKey
+import com.metrolist.music.constants.AdSecondsKey
+import com.metrolist.music.constants.DEFAULT_AD_EVERY_N_SONGS
+import com.metrolist.music.constants.DEFAULT_AD_SECONDS
+import com.metrolist.music.constants.DEFAULT_PREMIUM_SERVER_URL
+import com.metrolist.music.constants.IsPremiumKey
+import com.metrolist.music.constants.PremiumDevModeKey
+import com.metrolist.music.constants.PremiumEmailKey
+import com.metrolist.music.constants.PremiumExpiryKey
+import com.metrolist.music.constants.PremiumServerUrlKey
+import com.metrolist.music.constants.SongsSinceAdKey
 import com.metrolist.music.constants.LoudnessLevel
 import com.metrolist.music.constants.LoudnessLevelKey
 import com.metrolist.music.utils.CoilBitmapLoader
@@ -501,6 +520,8 @@ class MusicService :
     private var cachedPersistentQueue = true
     @Volatile
     private var cachedAutoplay = true
+    @Volatile
+    private var cachedPremium = PremiumSnapshot()
     @Volatile
     private var cachedDisableLoadMoreWhenRepeatAll = false
     @Volatile
@@ -1210,6 +1231,20 @@ class MusicService :
             dataStore.data.map { it[AutoplayKey] ?: true }.distinctUntilChanged().collect { cachedAutoplay = it }
         }
         scope.launch {
+            dataStore.data.map { prefs ->
+                PremiumSnapshot(
+                    isPremium = prefs[IsPremiumKey] == true,
+                    email = prefs[PremiumEmailKey],
+                    expiry = prefs[PremiumExpiryKey],
+                    serverUrl = prefs[PremiumServerUrlKey] ?: DEFAULT_PREMIUM_SERVER_URL,
+                    songsSinceAd = prefs[SongsSinceAdKey] ?: 0,
+                    adEveryNSongs = prefs[AdEveryNSongsKey] ?: DEFAULT_AD_EVERY_N_SONGS,
+                    adSeconds = prefs[AdSecondsKey] ?: DEFAULT_AD_SECONDS,
+                    devMode = prefs[PremiumDevModeKey] == true,
+                )
+            }.distinctUntilChanged().collect { cachedPremium = it }
+        }
+        scope.launch {
             dataStore.data.map { it[DisableLoadMoreWhenRepeatAllKey] ?: false }.distinctUntilChanged().collect { cachedDisableLoadMoreWhenRepeatAll = it }
         }
         scope.launch {
@@ -1243,7 +1278,18 @@ class MusicService :
                     }
                 }.onSuccess { queue ->
                     runCatching {
-                        val restoredQueue = queue.toQueue()
+                        // Older builds could persist the inserted ad as a normal song.
+                        // Drop those before restoring so they never reappear as a track.
+                        fun com.metrolist.music.models.MediaMetadata.isPersistedAd() =
+                            title == "Iklan" && artists.any { it.name == "BeatPlay Premium" }
+                        val removedBefore = queue.items.take(queue.mediaItemIndex.coerceAtLeast(0))
+                            .count { it.isPersistedAd() }
+                        val cleanedItems = queue.items.filterNot { it.isPersistedAd() }
+                        val restoredQueue = queue.copy(
+                            items = cleanedItems,
+                            mediaItemIndex = (queue.mediaItemIndex - removedBefore)
+                                .coerceIn(0, (cleanedItems.size - 1).coerceAtLeast(0)),
+                        ).toQueue()
                         scope.launch {
                             playerInitialized.first { it }
                             if (isActive) {
@@ -2563,6 +2609,48 @@ class MusicService :
         mediaItem: MediaItem?,
         reason: Int,
     ) {
+        // Natural advance into a new item: the previous song just finished.
+        // (ExoPlayer fires no ENDED between items, and crossfade swaps reuse
+        // this path too.) When the ad is due, insert it in front of the song
+        // that just auto-started and seek onto it.
+        val leftAd = AdGate.isAdMediaId(lastTransitionedMediaId)
+        if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO &&
+            !AdGate.isAdMediaId(mediaItem?.mediaId) && mediaItem != null &&
+            lastTransitionedMediaId != null && !leftAd && !AdState.isShowing() &&
+            castConnectionHandler?.isCasting?.value != true
+        ) {
+            val (action, newCount) = AdGate.decideAfterSong(
+                cachedPremium.isPremium, cachedPremium.songsSinceAd,
+                cachedPremium.adEveryNSongs, casting = false,
+            )
+            scope.launch(SilentHandler) { runCatching { setSongsSinceAd(newCount) } }
+            if (action == AdDecision.INSERT_AD) {
+                // The next song has already started (AUTO transition). Put the ad in
+                // front of it and seek onto the ad so the user hears exactly three
+                // songs, not four, before the break.
+                val adIndex = player.currentMediaItemIndex.coerceAtLeast(0)
+                player.addMediaItem(adIndex, buildAdMediaItem())
+                player.seekTo(adIndex, 0)
+            }
+        }
+        // Leaving an ad: drop it and reset the counter. This also covers a skip
+        // from notification/hardware controls; the overlay itself keeps counting
+        // down, so the break cannot actually be skipped.
+        if (AdGate.isAdMediaId(lastTransitionedMediaId) && !AdGate.isAdMediaId(mediaItem?.mediaId)) {
+            removeAdItems()
+            scope.launch(SilentHandler) { runCatching { resetAdCounter() } }
+        }
+        // Entering the ad: show the blocking overlay (capped by adSeconds,
+        // ended early by finishNow when the ad item completes or is left).
+        // Any transition reason counts: repeat-all and queue-end ads are reached
+        // through a seek, not an automatic advance.
+        if (AdGate.isAdMediaId(mediaItem?.mediaId) && !AdState.isShowing()) {
+            scope.launch(SilentHandler) {
+                AdState.showAdBlocking(cachedPremium.adSeconds, PREMIUM_AD_TEXT) {
+                    scope.launch(SilentHandler) { runCatching { resetAdCounter() } }
+                }
+            }
+        }
         // Only natural completion transitions mark the previous track as fully cached,
         // never a manual skip or seek. Read lastTransitionedMediaId before replacing it.
         if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
@@ -2680,6 +2768,17 @@ class MusicService :
             val repeatMode = player.repeatMode
 
             if (player.playWhenReady && repeatMode == REPEAT_MODE_ALL && player.mediaItemCount > 0) {
+                // Loop wrap counts as a finished song; insert the ad at the head when due.
+                if (!AdState.isShowing() && castConnectionHandler?.isCasting?.value != true) {
+                    val (action, newCount) = AdGate.decideAfterSong(
+                        cachedPremium.isPremium, cachedPremium.songsSinceAd,
+                        cachedPremium.adEveryNSongs, casting = false,
+                    )
+                    scope.launch(SilentHandler) { runCatching { setSongsSinceAd(newCount) } }
+                    if (action == AdDecision.INSERT_AD) {
+                        player.addMediaItem(0, buildAdMediaItem())
+                    }
+                }
                 player.seekTo(0, 0)
                 player.prepare()
                 player.play()
@@ -2693,12 +2792,35 @@ class MusicService :
                 return
             }
 
-            if (player.playWhenReady && cachedAutoplay && player.hasNextMediaItem()) {
-                player.seekToNextMediaItem()
-                player.prepare()
-                if (castConnectionHandler?.isCasting?.value != true) {
-                    player.play()
+            if (player.playWhenReady && cachedAutoplay) {
+                val endedId = player.currentMediaItem?.mediaId
+                if (AdGate.isAdMediaId(endedId)) {
+                    // Ad item reached its end (only possible when it was last): drop it.
+                    removeAdItems()
+                    AdState.finishNow()
+                    return
                 }
+                if (!player.hasNextMediaItem()) {
+                    // Queue finished: append a closing ad when one is due.
+                    if (!AdState.isShowing() && castConnectionHandler?.isCasting?.value != true) {
+                        val (action, newCount) = AdGate.decideAfterSong(
+                            cachedPremium.isPremium, cachedPremium.songsSinceAd,
+                            cachedPremium.adEveryNSongs, casting = false,
+                        )
+                        scope.launch(SilentHandler) { runCatching { setSongsSinceAd(newCount) } }
+                        if (action == AdDecision.INSERT_AD) {
+                            player.addMediaItem(buildAdMediaItem())
+                            player.seekTo(player.mediaItemCount - 1, 0)
+                            player.prepare()
+                            if (castConnectionHandler?.isCasting?.value != true) {
+                                player.play()
+                            }
+                        }
+                    }
+                    return
+                }
+                // Mid-queue advances are owned by onMediaItemTransition (ExoPlayer
+                // does not fire ENDED between items); nothing to do here.
             }
         }
 
@@ -2722,6 +2844,27 @@ class MusicService :
 
         if (playbackState == Player.STATE_IDLE || playbackState == Player.STATE_ENDED) {
             scrobbleManager?.onSongStop()
+        }
+    }
+
+    /** Video-ad queue item (bundled asset, plays inline on the player surface). */
+    private fun buildAdMediaItem(): MediaItem =
+        MediaItem.Builder()
+            .setMediaId(AdGate.AD_MEDIA_ID)
+            .setUri("asset:///ad.mp4")
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle("Iklan")
+                    .setArtist("BeatPlay Premium")
+                    .build(),
+            ).build()
+
+    /** Drop every ad item from the queue (called when leaving/finishing one). */
+    private fun removeAdItems() {
+        for (i in player.mediaItemCount - 1 downTo 0) {
+            if (player.getMediaItemAt(i).mediaId == AdGate.AD_MEDIA_ID) {
+                player.removeMediaItem(i)
+            }
         }
     }
 
@@ -3915,6 +4058,9 @@ class MusicService :
         playerProvider: () -> ExoPlayer?,
     ): DataSource.Factory {
         return ResolvingDataSource.Factory(createCacheDataSource()) { dataSpec ->
+            // The bundled video ad is a local asset, not a YouTube stream. It has no
+            // song cache key / database row, so let DefaultDataSource handle it directly.
+            if (dataSpec.uri.scheme == "asset") return@Factory dataSpec
             val mediaId = dataSpec.key ?: error("No media id")
             val storedFormat = runBlocking(Dispatchers.IO) { database.format(mediaId).first() }
             applyAudioNormalizationBeforePlayback(
@@ -4233,13 +4379,16 @@ class MusicService :
 
         try {
             val savedIndices = (0 until player.mediaItemCount).filter {
-                it == player.currentMediaItemIndex || !player.getMediaItemAt(it).isSmartShuffleRecommendation
+                val id = player.getMediaItemAt(it).mediaId
+                id != AdGate.AD_MEDIA_ID &&
+                    (it == player.currentMediaItemIndex || !player.getMediaItemAt(it).isSmartShuffleRecommendation)
             }
             val persistQueue =
                 currentQueue.toPersistQueue(
                     title = queueTitle,
                     items = savedIndices.mapNotNull { player.getMediaItemAt(it).metadata },
-                    mediaItemIndex = savedIndices.indexOf(player.currentMediaItemIndex),
+                    // Current item may be the (filtered-out) ad: fall back to queue head.
+                    mediaItemIndex = savedIndices.indexOf(player.currentMediaItemIndex).takeIf { it >= 0 } ?: 0,
                     position = player.currentPosition,
                 )
 
@@ -5173,6 +5322,7 @@ class MusicService :
 
         const val CHANNEL_ID = "music_channel_01"
         const val NOTIFICATION_ID = 888
+        const val PREMIUM_AD_TEXT = "BeatPlay Premium - dengarkan tanpa jeda iklan."
         const val ERROR_CODE_NO_STREAM = 1000001
         const val CHUNK_LENGTH = 512 * 1024L
         const val PERSISTENT_QUEUE_FILE = "persistent_queue.data"

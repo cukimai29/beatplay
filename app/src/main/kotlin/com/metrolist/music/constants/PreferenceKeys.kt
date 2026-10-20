@@ -533,6 +533,21 @@ val AccountEmailKey = stringPreferencesKey("accountEmail")
 val AccountChannelHandleKey = stringPreferencesKey("accountChannelHandle")
 val UseLoginForBrowse = booleanPreferencesKey("useLoginForBrowse")
 
+// BeatPlay Premium (Spotify-like): free users hear an audio ad every N songs,
+// premium users (Gmail allow-listed/paid on the premium server) do not.
+val PremiumEmailKey = stringPreferencesKey("premiumEmail")
+val IsPremiumKey = booleanPreferencesKey("isPremium")
+val PremiumExpiryKey = longPreferencesKey("premiumExpiry")
+val PremiumServerUrlKey = stringPreferencesKey("premiumServerUrl")
+val SongsSinceAdKey = intPreferencesKey("songsSinceAd")
+val AdEveryNSongsKey = intPreferencesKey("adEveryNSongs")
+val AdSecondsKey = intPreferencesKey("adSeconds")
+val PremiumDevModeKey = booleanPreferencesKey("premiumDevMode")
+
+const val DEFAULT_PREMIUM_SERVER_URL = "http://52.141.21.195:8080"
+const val DEFAULT_AD_EVERY_N_SONGS = 3
+const val DEFAULT_AD_SECONDS = 10
+
 val LanguageCodeToName =
     mapOf(
         "af" to "Afrikaans",

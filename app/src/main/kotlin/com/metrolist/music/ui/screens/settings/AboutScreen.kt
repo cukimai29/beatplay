@@ -100,17 +100,17 @@ private data class CommunityLink(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private val leadDeveloper = Contributor(
-    name = "cabrata",
+    name = "cukimai29",
     roleRes = R.string.utaloom_maintainer,
-    githubHandle = "cabrata",
+    githubHandle = "cukimai29",
     polygon = MaterialShapes.Cookie9Sided,
 )
 
 private val communityLinks = listOf(
-    CommunityLink(R.string.credits_view_repo, R.drawable.github, "https://github.com/cabrata/utaloom-android"),
-    CommunityLink(R.string.utaloom_desktop_app, R.drawable.language, "https://github.com/cabrata/utaloom"),
-    CommunityLink(R.string.utaloom_report_issue, R.drawable.bug_report, "https://github.com/cabrata/utaloom-android/issues"),
-    CommunityLink(R.string.credits_license_name, R.drawable.info, "https://github.com/cabrata/utaloom-android/blob/main/LICENSE")
+    CommunityLink(R.string.credits_view_repo, R.drawable.github, "https://github.com/cukimai29/beatplay"),
+    CommunityLink(R.string.utaloom_desktop_app, R.drawable.language, "https://github.com/cukimai29/beatplay/releases"),
+    CommunityLink(R.string.utaloom_report_issue, R.drawable.bug_report, "https://github.com/cukimai29/beatplay/issues"),
+    CommunityLink(R.string.credits_license_name, R.drawable.info, "https://github.com/cukimai29/beatplay/blob/main/LICENSE")
 )
 
 private fun handleEasterEggClick(
@@ -181,19 +181,19 @@ private fun DeveloperSocials(
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         FilledTonalButton(
-            onClick = { uriHandler.openUri("https://github.com/cabrata/utaloom") },
+            onClick = { uriHandler.openUri("https://github.com/cukimai29/beatplay/releases") },
             modifier = Modifier.weight(1f).height(48.dp)
         ) {
             Icon(painterResource(R.drawable.language), contentDescription = stringResource(R.string.utaloom_desktop_app))
         }
         FilledTonalButton(
-            onClick = { uriHandler.openUri("https://github.com/cabrata") },
+            onClick = { uriHandler.openUri("https://github.com/cukimai29") },
             modifier = Modifier.weight(1f).height(48.dp)
         ) {
             Icon(painterResource(R.drawable.github), contentDescription = leadDeveloper.name)
         }
         FilledTonalButton(
-            onClick = { uriHandler.openUri("https://github.com/cabrata/utaloom-android/issues") },
+            onClick = { uriHandler.openUri("https://github.com/cukimai29/beatplay/issues") },
             modifier = Modifier.weight(1f).height(48.dp)
         ) {
             Icon(painterResource(R.drawable.bug_report), contentDescription = stringResource(R.string.utaloom_report_issue))

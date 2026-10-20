@@ -1015,24 +1015,24 @@
     <string name="stream_source_web_creator_desc">Creator web client.</string>
     <string name="top_result">Top result</string>
     <string name="other">Other</string>
-    <string name="utaloom_name" translatable="false">Utaloom Android</string>
-    <string name="utaloom_github_releases_url" translatable="false">https://github.com/cabrata/utaloom-android/releases</string>
-    <string name="utaloom_update_available_message" translatable="false">Utaloom Android %s is ready to download.</string>
-    <string name="utaloom_last_fm_send_likes_description" translatable="false">Love or unlove songs in Last.fm when you like or unlike them in Utaloom Android</string>
-    <string name="utaloom_wrapped_intro_title" translatable="false">UTALOOM</string>
-    <string name="utaloom_logo_content_description" translatable="false">Utaloom Android logo</string>
-    <string name="utaloom_wrapped_special_thanks" translatable="false">Thanks to the original open-source contributors and the Utaloom community</string>
-    <string name="utaloom_tap_to_open" translatable="false">Tap to open Utaloom Android</string>
-    <string name="utaloom_crash_report_subject" translatable="false">Utaloom Android crash report</string>
-    <string name="utaloom_play_on_app" translatable="false">Play on Utaloom Android</string>
-    <string name="utaloom_listen_on_app" translatable="false">Listen on Utaloom Android</string>
-    <string name="utaloom_discord_information_warning" translatable="false">Utaloom Android uses Discord\'s public OAuth2 and Gateway APIs to share what you\'re listening to. Your token is encrypted on this device and is never shared. A separately configured Utaloom Discord application is required.</string>
-    <string name="utaloom_maintainer" translatable="false">Utaloom maintainer</string>
+    <string name="utaloom_name" translatable="false">BeatPlay</string>
+    <string name="utaloom_github_releases_url" translatable="false">https://github.com/cukimai29/beatplay/releases</string>
+    <string name="utaloom_update_available_message" translatable="false">BeatPlay %s is ready to download.</string>
+    <string name="utaloom_last_fm_send_likes_description" translatable="false">Love or unlove songs in Last.fm when you like or unlike them in BeatPlay</string>
+    <string name="utaloom_wrapped_intro_title" translatable="false">BEATPLAY</string>
+    <string name="utaloom_logo_content_description" translatable="false">BeatPlay logo</string>
+    <string name="utaloom_wrapped_special_thanks" translatable="false">Thanks to the original open-source contributors and the BeatPlay community</string>
+    <string name="utaloom_tap_to_open" translatable="false">Tap to open BeatPlay</string>
+    <string name="utaloom_crash_report_subject" translatable="false">BeatPlay crash report</string>
+    <string name="utaloom_play_on_app" translatable="false">Play on BeatPlay</string>
+    <string name="utaloom_listen_on_app" translatable="false">Listen on BeatPlay</string>
+    <string name="utaloom_discord_information_warning" translatable="false">BeatPlay uses Discord\'s public OAuth2 and Gateway APIs to share what you\'re listening to. Your token is encrypted on this device and is never shared. A separately configured Discord application is required.</string>
+    <string name="utaloom_maintainer" translatable="false">BeatPlay maintainer</string>
     <string name="utaloom_attribution" translatable="false">Based on open-source work from Metrolist, InnerTune, and OuterTune. Source attribution does not imply affiliation or endorsement.</string>
-    <string name="utaloom_independent_notice" translatable="false">Independently maintained by cabrata. Not affiliated with Metro Group, Metrolist, or MetrolistGroup.</string>
-    <string name="utaloom_desktop_app" translatable="false">Utaloom for desktop</string>
+    <string name="utaloom_independent_notice" translatable="false">Independently maintained. Not affiliated with Metro Group, Metrolist, or MetrolistGroup.</string>
+    <string name="utaloom_desktop_app" translatable="false">BeatPlay for desktop</string>
     <string name="utaloom_report_issue" translatable="false">Report an Android issue</string>
-    <string name="utaloom_discord_unavailable" translatable="false">Discord integration is unavailable in this build. It requires a Utaloom Discord application configured by the maintainer.</string>
+    <string name="utaloom_discord_unavailable" translatable="false">Discord integration is unavailable in this build. It requires a Discord application configured by the maintainer.</string>
     <string name="offline_mode">Offline mode</string>
     <string name="offline_mode_desc">Browse and play downloaded music and episodes only. Streaming, downloads and YouTube sync are paused.</string>
     <string name="offline_mode_empty">No downloaded music or episodes. Turn off offline mode to download some first.</string>
@@ -1045,4 +1045,45 @@
     <string name="download_quality_desc">Quality for new downloads, independent of streaming. Existing downloads keep their quality.</string>
     <string name="wifi_only_downloads">Wi-Fi / unmetered downloads only</string>
     <string name="wifi_only_downloads_desc">Pause on metered connections and resume on Wi-Fi or another unmetered network. Metered Wi-Fi is excluded.</string>
+    <string name="premium">Premium</string>
+    <string name="premium_status_active">Premium aktif</string>
+    <string name="premium_status_free">Paket gratis</string>
+    <string name="premium_active_desc">Tanpa iklan audio.</string>
+    <string name="premium_valid_until">Berlaku s/d %1$s.</string>
+    <string name="premium_free_desc">Iklan video 10 detik tiap %1$d lagu. Upgrade untuk mendengar tanpa jeda.</string>
+    <string name="premium_next_ad">Iklan berikutnya setelah %1$d lagu lagi.</string>
+    <string name="premium_email_label">Email akun</string>
+    <string name="premium_email_support">Gunakan email yang sama dengan pembayaran.</string>
+    <string name="premium_check">Cek status</string>
+    <string name="premium_checking">Mengecek…</string>
+    <string name="premium_active_for">Premium aktif untuk %1$s.</string>
+    <string name="premium_not_premium">%1$s belum premium.</string>
+    <string name="premium_check_failed">Gagal cek: %1$s</string>
+    <string name="premium_switch_account">Ganti akun</string>
+    <string name="premium_dev_mode">Mode developer (tombol tes iklan)</string>
+    <string name="premium_test_ad">Tes iklan %1$d dtk</string>
+    <string name="premium_plans_loading">Memuat paket…</string>
+    <string name="premium_plans_failed">Gagal muat paket: %1$s</string>
+    <string name="premium_create_order">Buat order</string>
+    <string name="premium_creating">Membuat…</string>
+    <string name="premium_open_qris_image">Buka gambar QRIS</string>
+    <string name="premium_pick_proof">Pilih foto bukti (wajib)</string>
+    <string name="premium_change_photo">Ganti foto</string>
+    <string name="premium_photo_invalid">Foto tidak valid (JPG/PNG, maks 4MB).</string>
+    <string name="premium_send_proof">Kirim bukti bayar</string>
+    <string name="premium_check_status">Cek status</string>
+    <string name="premium_stop_check">Berhenti cek</string>
+    <string name="premium_proof_sent">Bukti + foto terkirim. Menunggu verifikasi admin.</string>
+    <string name="premium_pending_verify">Bukti diterima. Menunggu verifikasi admin.</string>
+    <string name="premium_paid">Pembayaran lunas. Premium aktif.</string>
+    <string name="premium_order_status">Status: %1$s</string>
+    <string name="premium_create_failed">Gagal: %1$s</string>
+    <string name="premium_need_email">Isi email di atas dulu, lalu cek status.</string>
+    <string name="premium_sender_label">Nama pengirim DANA</string>
+    <string name="premium_note_label">Catatan (opsional)</string>
+    <string name="premium_ad_title">Iklan</string>
+    <string name="premium_ad_wait">Lagu berikutnya dalam %1$d dtk… (tidak bisa di-skip di akun gratis)</string>
+    <string name="premium_ad_upgrade">Lihat Premium</string>
+    <string name="premium_pay_to">Bayar ke: %1$s</string>
+    <string name="premium_sender_required">Nama pengirim wajib diisi</string>
 </resources>

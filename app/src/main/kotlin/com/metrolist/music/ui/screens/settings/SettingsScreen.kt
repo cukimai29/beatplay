@@ -74,6 +74,20 @@ fun SettingsScreen(
             )
         )
 
+        // BeatPlay Premium (top-level for visibility)
+        Material3SettingsGroup(
+            title = stringResource(R.string.premium),
+            items = listOf(
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.crown),
+                    title = { Text(stringResource(R.string.premium)) },
+                    onClick = { navController.navigate("settings/premium") }
+                )
+            )
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         // User Interface Section
         Material3SettingsGroup(
             title = stringResource(R.string.settings_section_ui),
@@ -224,14 +238,16 @@ fun SettingsScreen(
                         )
                     )
                 }
-                val showChangelog = com.metrolist.music.LocalChangelogState.current
-                add(
-                    Material3SettingsItem(
-                        icon = painterResource(R.drawable.newspaper),
-                        title = { Text(stringResource(R.string.changelog)) },
-                        onClick = { showChangelog.value = true }
+                if (BuildConfig.UPDATER_AVAILABLE) {
+                    val showChangelog = com.metrolist.music.LocalChangelogState.current
+                    add(
+                        Material3SettingsItem(
+                            icon = painterResource(R.drawable.newspaper),
+                            title = { Text(stringResource(R.string.changelog)) },
+                            onClick = { showChangelog.value = true }
+                        )
                     )
-                )
+                }
                 add(
                     Material3SettingsItem(
                         icon = painterResource(R.drawable.info),

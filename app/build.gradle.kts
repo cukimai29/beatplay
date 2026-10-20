@@ -10,6 +10,14 @@ if (localPropertiesFile.exists()) {
 val baseApplicationId = "com.cabrata.utaloom.android"
 val applicationIdOverride = System.getenv("UTALOOM_APPLICATION_ID")?.takeIf { it.isNotBlank() }
 val appNameOverride = System.getenv("UTALOOM_APP_NAME")?.takeIf { it.isNotBlank() }
+// Release signing (kept out of git). See signing.properties.example.
+val signingProperties = Properties()
+val signingPropertiesFile = rootProject.file("signing.properties")
+if (signingPropertiesFile.exists()) {
+    signingPropertiesFile.inputStream().use { signingProperties.load(it) }
+}
+fun signingValue(key: String, env: String): String? =
+    signingProperties.getProperty(key)?.takeIf { it.isNotBlank() } ?: System.getenv(env)?.takeIf { it.isNotBlank() }
 val buildCommit =
     System.getenv("UTALOOM_BUILD_COMMIT")
         ?.trim()
@@ -40,12 +48,12 @@ android {
         applicationId = applicationIdOverride ?: baseApplicationId
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "1.2.0"
+        versionCode = 7
+        versionName = "1.2.1"
         val baseVersionName = requireNotNull(versionName)
         buildConfigField("String", "BASE_VERSION_NAME", "\"$baseVersionName\"")
         buildCommit?.let { versionName = "$baseVersionName+$it" }
-        resValue("string", "app_name", appNameOverride ?: "Utaloom Android")
+        resValue("string", "app_name", appNameOverride ?: "BeatPlay")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -67,19 +75,20 @@ android {
 
     flavorDimensions += listOf("variant")
     productFlavors {
-        // FOSS - Updater, but no gcast
+        // FOSS - no gcast. Updates are distributed manually (MediaFire), never via the
+        // upstream GitHub updater, so the in-app checker stays off.
         create("foss") {
             dimension = "variant"
             isDefault = true
             buildConfigField("Boolean", "CAST_AVAILABLE", "false")
-            buildConfigField("Boolean", "UPDATER_AVAILABLE", "true")
+            buildConfigField("Boolean", "UPDATER_AVAILABLE", "false")
         }
 
-        // GMS - Updater and gcast
+        // GMS - gcast, manual updates only
         create("gms") {
             dimension = "variant"
             buildConfigField("Boolean", "CAST_AVAILABLE", "true")
-            buildConfigField("Boolean", "UPDATER_AVAILABLE", "true")
+            buildConfigField("Boolean", "UPDATER_AVAILABLE", "false")
         }
 
         // IzzyOnDroid - no gcast, no updater - the ONLY F-droid compliant build
@@ -104,12 +113,21 @@ android {
             keyPassword = debugKeyPassword
         }
         create("release") {
-            storeFile = file("keystore/release.keystore")
-            storePassword = System.getenv("STORE_PASSWORD")
-            keyAlias = System.getenv("KEY_ALIAS")
-            keyPassword = System.getenv("KEY_PASSWORD")
+            storeFile = signingValue("storeFile", "STORE_FILE")?.let(::file) ?: file("keystore/release.keystore")
+            storePassword = signingValue("storePassword", "STORE_PASSWORD")
+            keyAlias = signingValue("keyAlias", "KEY_ALIAS")
+            keyPassword = signingValue("keyPassword", "KEY_PASSWORD")
             enableV1Signing = true
             enableV2Signing = true
+        }
+        // Keeps the signing identity of the first manually distributed BeatPlay APK
+        // (Android debug key, package suffix .debug) so existing installs update in
+        // place and keep their library. New installs after migration use "release".
+        create("legacyDebug") {
+            storeFile = file("keystore/legacy-debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
         }
         getByName("debug") {
             keyAlias = "androiddebugkey"
@@ -125,11 +143,18 @@ android {
             isShrinkResources = true
             isCrunchPngs = false
             isDebuggable = false
-            if (System.getenv("STORE_PASSWORD") != null) signingConfig = signingConfigs.getByName("release")
+            if (signingValue("storePassword", "STORE_PASSWORD") != null) signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+        }
+        // Release build that can overwrite the first BeatPlay sideload APK.
+        create("compat") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".debug"
+            signingConfig = signingConfigs.getByName("legacyDebug")
+            matchingFallbacks += listOf("release")
         }
         debug {
             if (applicationIdOverride == null) {
@@ -137,7 +162,7 @@ android {
             }
             isDebuggable = true
             if (appNameOverride == null) {
-                resValue("string", "app_name", "Utaloom Android Debug")
+                resValue("string", "app_name", "BeatPlay")
             }
             signingConfig =
                 if (workflowDebugKeystoreFile != null) {
@@ -287,6 +312,7 @@ dependencies {
     implementation(libs.shimmer)
 
     implementation(libs.media3)
+    implementation(libs.media3.ui)
     implementation(libs.media3.session)
     implementation(libs.media3.okhttp)
 
@@ -310,6 +336,7 @@ dependencies {
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.client.encoding)
     implementation(libs.ktor.serialization.json)
+    implementation(libs.kotlinx.serialization.json)
 
     // Protobuf for message serialization (lite version for Android)
     implementation(libs.protobuf.javalite)

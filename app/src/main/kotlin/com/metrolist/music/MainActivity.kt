@@ -394,6 +394,10 @@ class MainActivity : FragmentActivity() {
         window.decorView.layoutDirection = View.LAYOUT_DIRECTION_LTR
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
+        // Older builds and the upstream checker could leave a bogus "update available"
+        // notification pointing at another app. BeatPlay updates are manual, so clear it.
+        runCatching { NotificationManagerCompat.from(this).cancel(1001) }
+
         // Initialize Listen Together manager
         listenTogetherManager.initialize()
 
@@ -1036,6 +1040,13 @@ class MainActivity : FragmentActivity() {
                 ) {
                     if (showChangelog.value) {
                         ChangelogScreen(onDismiss = { showChangelog.value = false })
+                    }
+
+                    // Ads must be visible no matter which screen is open. Keeping this
+                    // overlay at the app root also prevents audio-only ads when the
+                    // player sheet is collapsed (settings, library, etc.).
+                    activePlayerConnection?.let { connection ->
+                        com.metrolist.music.premium.AdOverlay(player = connection.player)
                     }
 
                     Scaffold(

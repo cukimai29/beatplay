@@ -47,6 +47,10 @@ fun ChangelogScreen(
     val uriHandler = LocalUriHandler.current
 
     LaunchedEffect(Unit) {
+        if (!BuildConfig.UPDATER_AVAILABLE) {
+            isLoading = false
+            return@LaunchedEffect
+        }
         Updater.getAllReleases().onSuccess { allReleases ->
             releases = allReleases.filter { release ->
                 Updater.compareVersions(BuildConfig.BASE_VERSION_NAME, release.tagName) >= 0

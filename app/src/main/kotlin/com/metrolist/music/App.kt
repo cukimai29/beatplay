@@ -89,9 +89,16 @@ class App :
             Timber.e(e, "Failed to ensure DataStore directory")
         }
 
-        // Plant logging before extraction services initialize.
-        Timber.plant(Timber.DebugTree())
-        YouTube.offlineMode = runBlocking(Dispatchers.IO) { dataStore.data.first()[OfflineModeKey] ?: false }
+        // Plant logging before extraction services initialize. Release builds skip the
+        // verbose debug tree so startup and playback do not pay for log formatting.
+        if (BuildConfig.DEBUG) Timber.plant(Timber.DebugTree())
+        // Never block the main thread on DataStore during cold start; the settings
+        // observer below will keep this in sync afterwards.
+        applicationScope.launch(Dispatchers.IO) {
+            runCatching {
+                YouTube.offlineMode = dataStore.data.first()[OfflineModeKey] ?: false
+            }
+        }
         InnerTubeXPlayer.initialize(this)
 
         // Pre-read Coil cache size on background to avoid runBlocking in newImageLoader

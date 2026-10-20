@@ -53,6 +53,7 @@ import com.metrolist.music.ui.screens.settings.ContentSettings
 import com.metrolist.music.ui.screens.settings.DarkMode
 import com.metrolist.music.ui.screens.settings.LyricsProviderSettings
 import com.metrolist.music.ui.screens.settings.PlayerSettings
+import com.metrolist.music.ui.screens.settings.PremiumSettingsScreen
 import com.metrolist.music.ui.screens.settings.PrivacySettings
 import com.metrolist.music.ui.screens.settings.RomanizationSettings
 import com.metrolist.music.ui.screens.settings.SettingsScreen
@@ -359,6 +360,14 @@ fun NavGraphBuilder.navigationBuilder(
 
     composable("settings") {
         SettingsScreen(navController, latestVersionName)
+    }
+
+    composable("settings/premium") {
+        PremiumSettingsScreen(navController)
+    }
+
+    composable("settings/premium/advanced") {
+        PremiumSettingsScreen(navController, showAdvanced = true)
     }
 
     composable("settings/appearance") {

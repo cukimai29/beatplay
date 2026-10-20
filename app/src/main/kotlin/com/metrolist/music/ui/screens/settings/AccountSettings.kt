@@ -6,6 +6,8 @@
 package com.metrolist.music.ui.screens.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -39,6 +41,7 @@ import com.metrolist.music.utils.reportException
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -86,6 +89,7 @@ fun AccountSettings(
     val (accountEmail, onAccountEmailChange) = rememberPreference(AccountEmailKey, "")
     val (accountChannelHandle, onAccountChannelHandleChange) = rememberPreference(AccountChannelHandleKey, "")
     val (innerTubeCookie, onInnerTubeCookieChange) = rememberPreference(InnerTubeCookieKey, "")
+    val (isPremiumAccount) = rememberPreference(com.metrolist.music.constants.IsPremiumKey, false)
     val (visitorData, onVisitorDataChange) = rememberPreference(VisitorDataKey, "")
     val (dataSyncId, onDataSyncIdChange) = rememberPreference(DataSyncIdKey, "")
     val (authUser, onAuthUserChange) = rememberPreference(InnerTubeAuthUserKey, "0")
@@ -260,12 +264,25 @@ fun AccountSettings(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (isLoggedIn && accountImageUrl != null) {
-                                AsyncImage(
-                                    model = accountImageUrl,
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.size(40.dp).clip(CircleShape)
-                                )
+                                val gold = Color(0xFFFFC94D)
+                                Box(contentAlignment = Alignment.Center) {
+                                    AsyncImage(
+                                        model = accountImageUrl,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.size(40.dp).clip(CircleShape)
+                                            .border(if (isPremiumAccount) 2.dp else 0.dp, gold, CircleShape)
+                                    )
+                                    if (isPremiumAccount) {
+                                        Icon(
+                                            painterResource(R.drawable.crown),
+                                            contentDescription = "Premium",
+                                            tint = gold,
+                                            modifier = Modifier.align(Alignment.BottomEnd).size(16.dp)
+                                                .background(MaterialTheme.colorScheme.surface, CircleShape),
+                                        )
+                                    }
+                                }
 
                                 Spacer(Modifier.width(12.dp))
                             }
