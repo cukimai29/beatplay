@@ -59,7 +59,7 @@ footer{border-top:1px solid var(--line);margin-top:34px;padding:26px 0 44px;colo
 <div class="wrap" id="unduh">
 <header class="hero">
 <h1>Download BeatPlay</h1>
-<p>Gratis, langsung dari GitHub Releases.</p>
+<p>Gratis, langsung dari server BeatPlay.</p>
 </header>
 <div class="tabs" role="tablist">
 <button class="tab on" data-p="windows">Windows</button>
@@ -68,11 +68,11 @@ footer{border-top:1px solid var(--line);margin-top:34px;padding:26px 0 44px;colo
 </div>
 <div class="grid">
 <div class="card">
-<div class="live"><i></i><span id="live-label">MEMUAT DARI GITHUB…</span></div>
+<div class="live"><i></i><span id="live-label">MEMUAT RILIS…</span></div>
 <h2 id="plat-title" style="margin:10px 0 4px">Halo, Windows.</h2>
 <div class="ver" id="ver">…</div>
 <div id="files"><p class="spin">Memuat daftar file…</p></div>
-<div class="note">✔ File asli dari repository, tanpa mirror atau reupload.</div>
+<div class="note">✔ File resmi BeatPlay, siap dipasang.</div>
 </div>
 <div class="card">
 <p style="margin:0 0 4px;font-size:12px;font-weight:700;letter-spacing:2px;color:var(--mut)">SEBELUM TEKAN PLAY</p>
@@ -86,10 +86,9 @@ footer{border-top:1px solid var(--line);margin-top:34px;padding:26px 0 44px;colo
 
 <script>
 const REPO = "cukimai29/beatplay";
-/* GANTI dengan link MediaFire APK Android kamu */
-const ANDROID_APK_URL = "https://www.mediafire.com/file/bln9ewuhp805vjt/BeatPlay-1.2.0-android.apk/file";
-const ANDROID_APK_NAME = "BeatPlay-1.2.0-android.apk";
-const ANDROID_APK_SIZE = "±56 MB";
+const ANDROID_APK_URL = "https://github.com/cukimai29/beatplay/releases/download/android-v1.2.1/BeatPlay-1.2.1-android.apk";
+const ANDROID_APK_NAME = "BeatPlay-1.2.1-android.apk";
+const ANDROID_APK_SIZE = "±30 MB";
 
 const PLATFORMS = {
   windows: {
@@ -111,7 +110,7 @@ const PLATFORMS = {
   android: {
     title: "Halo, Android.",
     manual: true,
-    steps: [["Download APK.", "File diambil dari MediaFire."],
+    steps: [["Download APK.", "File APK diunduh langsung dari server BeatPlay."],
             ["Buka file APK.", "Izinkan instalasi dari browser atau file manager yang kamu gunakan."],
             ["Install, lalu tekan play.", "Memerlukan Android 8.0 atau lebih baru."]],
     note: "<b>Catatan:</b> APK tidak dari Play Store, jadi Android meminta izin instalasi manual satu kali."
@@ -137,7 +136,7 @@ function fmtDate(s) {
 async function loadRelease() {
   if (releaseCache) return releaseCache;
   const r = await fetch("https://api.github.com/repos/" + REPO + "/releases/latest", { headers: { "Accept": "application/vnd.github+json" } });
-  if (!r.ok) throw new Error("GitHub API " + r.status);
+  if (!r.ok) throw new Error("Server rilis " + r.status);
   releaseCache = await r.json();
   return releaseCache;
 }
@@ -157,11 +156,11 @@ async function render() {
   }
   try {
     const rel = await loadRelease();
-    document.getElementById("live-label").textContent = "LIVE DARI GITHUB RELEASES";
+    document.getElementById("live-label").textContent = "RILIS TERBARU";
     document.getElementById("ver").textContent = "Versi " + rel.tag_name + " · Rilis " + fmtDate(rel.published_at);
     const files = (rel.assets || []).filter(cfg.match);
     if (!files.length) {
-      filesEl.innerHTML = '<div class="err">Belum ada file untuk platform ini di rilis terbaru. Lihat <a href="https://github.com/' + REPO + '/releases">semua rilis</a>.</div>';
+      filesEl.innerHTML = '<div class="err">Belum ada file untuk platform ini di rilis terbaru. Coba lagi nanti.</div>';
       return;
     }
     filesEl.innerHTML = files.map(f =>
@@ -170,7 +169,7 @@ async function render() {
     ).join("");
   } catch (e) {
     document.getElementById("live-label").textContent = "GAGAL MEMUAT";
-    filesEl.innerHTML = '<div class="err">Tidak bisa mengambil data rilis (' + e.message + '). Coba lagi nanti atau buka langsung <a href="https://github.com/' + REPO + '/releases">halaman rilis</a>.</div>';
+    filesEl.innerHTML = '<div class="err">Tidak bisa mengambil data rilis (' + e.message + '). Periksa koneksi lalu muat ulang halaman ini.</div>';
   }
 }
 
