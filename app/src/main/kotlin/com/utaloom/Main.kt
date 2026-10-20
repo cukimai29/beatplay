@@ -14,6 +14,7 @@ import com.utaloom.platform.DesktopWindows
 import com.utaloom.platform.DiscordPresence
 import com.utaloom.platform.GlobalHotkeys
 import com.utaloom.platform.Scrobbling
+import com.utaloom.platform.SingleInstance
 import com.utaloom.data.ListeningStats
 import com.utaloom.playback.Player
 import com.utaloom.together.ListenTogether
@@ -25,6 +26,9 @@ import com.utaloom.ui.MiniPlayer
 fun main() = runApp(exitProcessOnExit = true)
 
 internal fun runApp(exitProcessOnExit: Boolean) {
+    // Double-clicking the icon while BeatPlay is in the tray must focus the running
+    // instance, not boot a second copy that competes for the same library files.
+    if (!SingleInstance.acquireOrNotify()) return
     applySession()
     val vlcError = NativeLibs.discoverVlc()
     if (vlcError == null) Player.init() else System.err.println(vlcError)
@@ -122,6 +126,10 @@ internal fun runApp(exitProcessOnExit: Boolean) {
             DiscordPresence.stop(); ListeningStats.stop(); DesktopWindows.closeMini()
             Mpris.stop(); Player.release(); Stores.flushAll(); exitApplication()
         }
+        LaunchedEffect(Unit) {
+            SingleInstance.showRequests.collect { showMain() }
+        }
+
         DisposableEffect(Unit) {
             Mpris.start(
                 onRaise = { javax.swing.SwingUtilities.invokeLater { showMain() } },
