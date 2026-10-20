@@ -15,14 +15,14 @@
   --gold:#f4b740;--radius:24px;--shadow:0 30px 70px -30px rgba(26,25,58,.28);--progress:0;
 }
 *{box-sizing:border-box}
-html{scroll-behavior:smooth;overflow-x:hidden}
+html{scroll-behavior:smooth}
 body{
   margin:0;color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   line-height:1.6;background:
     radial-gradient(900px 520px at 88% -6%,#eef0ff 0%,transparent 62%),
     radial-gradient(720px 460px at -8% 24%,#f7f2ff 0%,transparent 58%),
     var(--bg);
-  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
 }
 ::selection{background:var(--indigo);color:#fff}
 a{color:var(--indigo);text-decoration:none}
@@ -57,7 +57,7 @@ nav .links a:hover::after{transform:scaleX(1)}
 /* hero */
 .hero{position:relative;display:grid;grid-template-columns:1.02fr .98fr;gap:52px;align-items:center;padding-top:78px;padding-bottom:92px}
 .hero::before,.hero::after{content:"";position:absolute;border-radius:50%;filter:blur(70px);pointer-events:none;z-index:0}
-.hero::before{width:320px;height:320px;right:-30px;top:-60px;background:rgba(99,102,241,.16);animation:drift 12s ease-in-out infinite}
+.hero::before{width:320px;height:320px;right:0;top:-60px;background:rgba(99,102,241,.16);animation:drift 12s ease-in-out infinite}
 .hero::after{width:260px;height:260px;left:-100px;bottom:-40px;background:rgba(168,85,247,.12);animation:drift 14s ease-in-out infinite reverse}
 .hero-copy,.hero-art{position:relative;z-index:1}
 .eyebrow{display:inline-flex;align-items:center;gap:9px;margin:0 0 18px;padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.72);color:var(--indigo-dark);font-size:11px;font-weight:800;letter-spacing:1.7px;text-transform:uppercase;backdrop-filter:blur(8px)}
@@ -202,7 +202,7 @@ footer{margin-top:26px;border-top:1px solid var(--line);background:rgba(255,255,
   .brand{font-size:16px}
   .brand img{width:31px;height:31px}
   .hero{padding-top:44px}
-  .hero::before{width:260px;height:260px;right:-8px;top:-40px}
+  .hero::before{width:260px;height:260px;right:0;top:-40px}
   .hero h1{font-size:clamp(36px,11vw,52px)}
   .hero-copy>p:not(.eyebrow){font-size:15.5px}
   .cta{flex-direction:column;align-items:stretch}
