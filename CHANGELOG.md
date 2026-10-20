@@ -1,5 +1,11 @@
 # Changelog
 
+## [v1.5.2] - 2026-10-20
+
+* fix(desktop): fokus instance yang sudah berjalan, cegah dobel proses (1332d03)
+* Pasang link MediaFire APK Android (ec7c7e1)
+* Halaman download live dari GitHub Releases (38f0635)
+
 ## [v1.5.1] - 2026-10-15
 
 * Rilis patch 1.5.1 (b0fd666)
