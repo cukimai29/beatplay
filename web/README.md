@@ -7,22 +7,30 @@ build step dan tanpa framework.
 
 Link APK ada di `download.html`:
 
-- `ANDROID_APK_URL` — URL file APK
+- `ANDROID_APK_URL` — halaman file APK di MediaFire
 - `ANDROID_APK_NAME` — nama file yang ditampilkan
 - `ANDROID_APK_SIZE` — ukuran yang ditampilkan
 
-Ganti ketiganya setiap kali ada APK baru. Untuk mirror MediaFire, cukup ganti
-`ANDROID_APK_URL` dengan link download MediaFire.
+APK resmi saat ini:
+`https://www.mediafire.com/file/qh977ew8l7rqk0y/BeatPlay-1.2.1-android.apk/file`
+
+Ganti ketiganya setiap kali ada APK baru. Unggah APK ke MediaFire lebih dulu,
+lalu pakai URL halaman file MediaFire sebagai `ANDROID_APK_URL`.
 
 ## Deploy InfinityFree
 
 1. Login ke vPanel InfinityFree, buka **File Manager**.
-2. Masuk ke folder `htdocs`.
-3. Upload isi folder `web/` (atau `BeatPlay-website.zip`, lalu extract di
-   `htdocs` dan hapus zip-nya).
-4. Buka **SSL/TLS → Free SSL Certificates**, pilih domain, lalu install
+2. Masuk ke folder `htdocs`. Hapus `index2.html` bawaan bila ada.
+3. Upload `BeatPlay-website.zip` ke `htdocs`.
+4. Klik kanan zip tersebut, pilih **Extract**, lalu hapus zip-nya. Pastikan
+   `index.html`, `download.html`, dan folder `img/` berada langsung di
+   `htdocs` (bukan di dalam subfolder).
+5. Buka domainnya, cek halaman utama dan tab **Android → Download**.
+6. Buka **SSL/TLS → Free SSL Certificates**, pilih domain, lalu install
    sertifikat gratis.
-5. Aktifkan **Force HTTPS** di menu SSL setelah sertifikat aktif.
+7. Setelah sertifikat aktif, aktifkan **Force HTTPS** di menu SSL.
+8. Bila halaman lama masih muncul, tunggu beberapa menit lalu hard-refresh
+   (`Ctrl+F5`).
 
 ## Deploy alternatif
 
