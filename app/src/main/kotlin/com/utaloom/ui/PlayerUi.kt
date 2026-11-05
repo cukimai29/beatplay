@@ -1,18 +1,13 @@
 package com.utaloom.ui
 
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -419,11 +414,30 @@ private fun MobileFullPlayer(onClose: () -> Unit, initialPage: PlayerPage, fulls
 fun FullPlayer(onClose: () -> Unit, fullscreen: Boolean, onToggleFullscreen: () -> Unit, compact: Boolean = false, initialPage: PlayerPage = PlayerPage.NOW_PLAYING) {
     if (compact) return MobileFullPlayer(onClose, initialPage, fullscreen, onToggleFullscreen)
     val s by Player.state.collectAsState()
+    val settings by Stores.settings.state.collectAsState()
     val guest = isGuest()
     var tab by remember { mutableStateOf(0) } // 0 lyrics, 1 queue
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        // Apple Music style backdrop: the cover art, heavily blurred, tints the whole view.
-        AsyncImage(hiRes(s.current?.thumbnail, 120), null, Modifier.fillMaxSize().graphicsLayer { alpha = 0.45f; scaleX = 1.3f; scaleY = 1.3f }.blur(90.dp), contentScale = ContentScale.Crop)
+        // Apple Music style backdrop. Blurring a full-window image costs a lot on Windows, so it is
+        // opt-in; the default path tints the whole view with a cheap scaled cover + gradient scrim.
+        val backdrop = Modifier.fillMaxSize().graphicsLayer {
+            alpha = if (settings.backgroundBlurEnabled) 0.50f else 0.22f
+            scaleX = 1.2f; scaleY = 1.2f
+        }
+        AsyncImage(
+            hiRes(s.current?.thumbnail, if (settings.backgroundBlurEnabled) 120 else 544), null,
+            if (settings.backgroundBlurEnabled) backdrop.blur(32.dp) else backdrop,
+            contentScale = ContentScale.Crop,
+        )
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    0f to MaterialTheme.colorScheme.background.copy(alpha = 0.30f),
+                    0.45f to MaterialTheme.colorScheme.background.copy(alpha = 0.72f),
+                    1f to MaterialTheme.colorScheme.background.copy(alpha = 0.96f),
+                ),
+            ),
+        )
         Column(Modifier.fillMaxSize().padding(24.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClose) { Icon(Icons.Default.ExpandMore, "Close player") }
@@ -656,28 +670,29 @@ fun LyricsPanel(modifier: Modifier = Modifier, compact: Boolean = false) {
                 }
             }
         } else {
-            val pos = smoothPosition(s.positionMs, s.isPlaying, settings.playbackSpeed)
             val items = remember(ly) { lyricItems(ly.lines) }
+            // Line selection uses VLC's ~4 Hz clock. Per-frame interpolation happens only inside
+            // the active karaoke row, so the whole lyric list no longer recomposes 60x per second.
+            val reported = s.positionMs
             // Focus = latest started line or gap. Background vocals never take focus, they light up with their line.
-            val current = items.indexOfLast { (it.line < 0 || !ly.lines[it.line].background) && it.startMs <= pos + 300 }
+            val current = items.indexOfLast { (it.line < 0 || !ly.lines[it.line].background) && it.startMs <= reported + 300 }
             // Like Android: lit only while being sung, so a finished line dims and duet lines can light together.
-            val sung = ly.activeLines(pos)
+            val sung = ly.activeLines(reported)
             val list = rememberLazyListState()
             val hover = remember { MutableInteractionSource() }
             val hovered by hover.collectIsHoveredAsState()
+            val bg = MaterialTheme.colorScheme.background
             LaunchedEffect(song.id, current) { list.animateScrollToItem(current.coerceAtLeast(0)) }
             BoxWithConstraints(Modifier.weight(1f).hoverable(hover)) {
-                VScrollColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(top = maxHeight * 0.25f, bottom = maxHeight * 0.7f),
-                    // Fade the lyrics, not the scrollbar.
-                    contentModifier = Modifier.graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.drawWithContent {
-                        drawContent()
-                        drawRect(Brush.verticalGradient(0f to Color.Transparent, 0.1f to Color.Black, 0.8f to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
-                    }) {
+                VScrollColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(top = maxHeight * 0.25f, bottom = maxHeight * 0.7f)) {
                     itemsIndexed(items) { i, item ->
                         if (item.line < 0) {
                             // Gap: dots only while it is playing, collapsed otherwise so lines don't jump around.
-                            Box(Modifier.fillMaxWidth().animateContentSize().padding(horizontal = 16.dp)) {
-                                if (i == current && pos < item.endMs) InterludeDots((pos - item.startMs).toFloat() / (item.endMs - item.startMs), pos)
+                            Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                                if (i == current) {
+                                    val pos = smoothPosition(reported, s.isPlaying, settings.playbackSpeed)
+                                    if (pos < item.endMs) InterludeDots((pos - item.startMs).toFloat() / (item.endMs - item.startMs), pos)
+                                }
                             }
                             return@itemsIndexed
                         }
@@ -685,9 +700,10 @@ fun LyricsPanel(modifier: Modifier = Modifier, compact: Boolean = false) {
                         val active = item.line in sung
                         // Background vocals only show while they or their main line are sung.
                         val visible = !line.background || active || ly.mainOf(item.line) in sung
-                        Box(Modifier.fillMaxWidth().animateContentSize()) {
+                        Box(Modifier.fillMaxWidth()) {
                             if (visible) LyricRow(
-                                line, active, distance = if (current < 0) i + 1 else abs(i - current), pos = if (active) pos else 0L,
+                                line, active, distance = if (current < 0) i + 1 else abs(i - current),
+                                reportedPos = reported, playing = s.isPlaying, speed = settings.playbackSpeed,
                                 style = if (line.background) style.copy(fontSize = fontSize * 0.7f, lineHeight = fontSize * 0.9f, fontStyle = FontStyle.Italic) else style,
                                 sharp = hovered || compact,
                                 romanized = romanizedLines?.getOrNull(item.line),
@@ -698,6 +714,17 @@ fun LyricsPanel(modifier: Modifier = Modifier, compact: Boolean = false) {
                         }
                     }
                 }
+                // Cheap edge fade: paint the background over the edges. The old implementation asked
+                // Compose for a full-screen offscreen layer every frame just to apply a DstIn mask.
+                Box(Modifier.matchParentSize().drawWithContent {
+                    drawContent()
+                    drawRect(Brush.verticalGradient(
+                        0f to bg.copy(alpha = 0.92f),
+                        0.08f to Color.Transparent,
+                        0.90f to Color.Transparent,
+                        1f to bg.copy(alpha = 0.92f),
+                    ))
+                })
             }
         }
         Row(
@@ -757,7 +784,9 @@ private fun LyricRow(
     line: LyricLine,
     active: Boolean,
     distance: Int,
-    pos: Long,
+    reportedPos: Long,
+    playing: Boolean,
+    speed: Float,
     style: TextStyle,
     sharp: Boolean,
     romanized: String? = null,
@@ -770,7 +799,6 @@ private fun LyricRow(
     val motion = spring<Float>(dampingRatio = 0.8f, stiffness = 120f)
     val scale by animateFloatAsState(if (active) 1f else 0.94f, motion)
     val alpha by animateFloatAsState(if (active) 1f else if (sharp) 0.5f else 0.42f - d * 0.05f, motion)
-    val blur by animateDpAsState(if (active || sharp) 0.dp else (d * 1.2f).dp, spring(stiffness = 120f))
     // Duet: second singer on the right, both together centered.
     val (align, textAlign, originX) = when (line.agent) {
         "v2" -> Triple(Alignment.End, TextAlign.End, 1f)
@@ -786,13 +814,14 @@ private fun LyricRow(
         Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp))
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 16.dp, vertical = 10.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale; this.alpha = alpha; transformOrigin = TransformOrigin(originX, 0.5f) }
-            .blur(blur, BlurredEdgeTreatment.Unbounded)
-            .animateContentSize(),
+            .graphicsLayer { scaleX = scale; scaleY = scale; this.alpha = alpha; transformOrigin = TransformOrigin(originX, 0.5f) },
         horizontalAlignment = align,
     ) {
         when {
             active && !asMain && line.words.isNotEmpty() -> {
+                // Only the active line reads the frame clock, keeping karaoke smooth without
+                // invalidating every other lyric row.
+                val pos = smoothPosition(reportedPos, playing, speed)
                 val gap = with(LocalDensity.current) { (style.fontSize * 0.26f).toDp() }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(gap, align)) {
                     for (w in lyricWordGroups(line.text, line.words)) KaraokeWord(w, pos, style, color)

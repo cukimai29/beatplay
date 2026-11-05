@@ -156,7 +156,8 @@ fun SettingsScreen(isMobile: Boolean = System.getProperty("java.vm.name") == "Da
         item { HorizontalDivider(Modifier.padding(horizontal = 24.dp)); SectionTitle("Appearance") }
         item { SettingsChoice("Theme", "Follow your system or choose a fixed appearance.", s.darkMode, listOf("system" to "System", "dark" to "Dark", "light" to "Light")) { v -> Stores.settings.update { it.copy(darkMode = v) } } }
         item { SettingsToggle("Dynamic color", "Use the current track artwork for the app accent color.", s.dynamicColor) { v -> Stores.settings.update { it.copy(dynamicColor = v) } } }
-        if (!isMobile) item { SettingsToggle("Keep playing in tray", "Keep BeatPlay running and continue playback when you close its window, if a system tray is available.", s.closeOnTray) { v -> Stores.settings.update { it.copy(closeOnTray = v, minimizeToTray = v) } } }
+        item { SettingsToggle("Blurred artwork backdrop", "Blur the album art behind the full player. Prettier, but heavier on older GPUs.", s.backgroundBlurEnabled) { v -> Stores.settings.update { it.copy(backgroundBlurEnabled = v) } } }
+        if (!isMobile) item { SettingsToggle("Keep playing in tray", "Keep BeatPlay running and continue playback when you close its window, if a system tray is available. Off means closing stops playback.", s.closeOnTray) { v -> Stores.settings.update { it.copy(closeOnTray = v, minimizeToTray = v) } } }
         if (!isMobile) item {
             FlowRow(Modifier.padding(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(com.utaloom.platform.DesktopWindows::showMini) { Text("Open mini player") }
@@ -195,7 +196,7 @@ fun SettingsScreen(isMobile: Boolean = System.getProperty("java.vm.name") == "Da
         }
         item { HorizontalDivider(Modifier.padding(horizontal = 24.dp)); SectionTitle("Playback") }
         item { SettingsChoice("Audio quality", "Applies when loading the next track. Downloads use high quality.", s.audioQuality, listOf("AUTO" to "Automatic", "HIGH" to "High", "LOW" to "Low")) { v -> Stores.settings.update { it.copy(audioQuality = v) } } }
-        item { SettingsToggle("Volume normalization", "Reduce volume differences between tracks. Applies when loading the next track.", s.normalizeVolume) { v -> Stores.settings.update { it.copy(normalizeVolume = v) } } }
+        item { SettingsToggle("Volume normalization", "Gently level tracks that are louder than YouTube's target (at most −1.4 dB). Off by default so the volume you set stays where you set it.", s.normalizeVolume) { v -> Stores.settings.update { it.copy(normalizeVolume = v) } } }
         item { SettingsToggle("Smart shuffle", "Mix a recommended song after every three songs while shuffling playlists and albums.", s.smartShuffle, Player::setSmartShuffle) }
         if (!isMobile) item { PlaybackSettings() }
         if (!isMobile) item {
@@ -372,7 +373,7 @@ private fun UpdateRow() {
     fun Details(modifier: Modifier) {
         Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("BeatPlay ${com.utaloom.platform.Updates.current}", style = MaterialTheme.typography.titleMedium)
-            Text(status ?: "Updates come from GitHub releases.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(status ?: "Update downloads open beatplay.wuaze.com.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
     @Composable

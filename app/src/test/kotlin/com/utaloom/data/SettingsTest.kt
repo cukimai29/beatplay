@@ -3,6 +3,7 @@ package com.utaloom.data
 import com.utaloom.lyrics.Romanization
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Test
 
@@ -70,5 +71,20 @@ class SettingsTest {
             if (url == expected) assertSame(parsed, normalized)
             assertSame(normalized, normalized.normalizeLegacyLtServerUrl())
         }
+    }
+
+    @Test
+    fun legacyVolumeAndBlurDefaultsAreResetOnce() {
+        // 1.5.2 and older saved these defaults explicitly, so a default change alone would not fix
+        // existing installs. The first run of 1.5.3 resets them exactly once.
+        val legacy = Settings(normalizeVolume = true, backgroundBlurEnabled = true)
+        val migrated = legacy.migrate()
+        assertFalse(migrated.normalizeVolume)
+        assertFalse(migrated.backgroundBlurEnabled)
+        assertEquals(1, migrated.settingsSchema)
+
+        // A user who explicitly turns either option back on keeps that choice on later launches.
+        val optedInAgain = migrated.copy(normalizeVolume = true, backgroundBlurEnabled = true)
+        assertSame(optedInAgain, optedInAgain.migrate())
     }
 }

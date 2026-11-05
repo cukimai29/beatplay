@@ -67,7 +67,7 @@ data class Settings(
     val dynamicColor: Boolean = true,
     val audioQuality: String = "AUTO", // AUTO | HIGH | LOW
     val volume: Int = 80,
-    val normalizeVolume: Boolean = true,
+    val normalizeVolume: Boolean = false, // opt-in: per-track gain can sound like the volume "randomly" drops
     val smartShuffle: Boolean = false,
     val cookie: String? = null,
     val visitorData: String? = null,
@@ -92,7 +92,7 @@ data class Settings(
     val lyricsTextSize: Int = 26,
     val minimizeToTray: Boolean = true,
     val closeOnTray: Boolean = false, // if true, close button minimizes to tray; if false, closes app
-    val backgroundBlurEnabled: Boolean = true,
+    val backgroundBlurEnabled: Boolean = false, // full-screen blur is expensive on low-end Windows GPUs
     val equalizerEnabled: Boolean = false,
     val equalizerPreset: String = "Flat",
     val equalizerPreamp: Float = 0f,
@@ -138,9 +138,25 @@ data class Settings(
     val adSeconds: Int = 15,
     // Path file video iklan lokal. Kosong = pakai video bawaan (ad.mp4).
     val adVideoPath: String = "",
+    // Internal schema marker so bug fixes can reset settings that used to have harmful defaults.
+    val settingsSchema: Int = 0,
 ) {
     internal fun normalizeLegacyLtServerUrl() =
         if (ltServerUrl.trim() == "wss://metrolist.caliph.dev/ws") copy(ltServerUrl = "wss://utaloom.caliph.dev/ws") else this
+
+    /**
+     * One-time upgrades for settings saved by older builds. Existing files already contain the old
+     * defaults, so changing a default alone would never reach users who are upgrading.
+     */
+    internal fun migrate(): Settings {
+        var s = this
+        if (s.settingsSchema < 1) {
+            // 1.5.3: loudness normalization (up to -3 dB) and the full-window blur were both on by
+            // default, which users experienced as volume randomly dropping and a heavy UI.
+            s = s.copy(normalizeVolume = false, backgroundBlurEnabled = false, settingsSchema = 1)
+        }
+        return s
+    }
 
     /** Saved order first, then providers added in later versions. */
     val lyricsProviderOrder get() = lyricsOrder.filter { it in LyricsRepository.providers } + LyricsRepository.providers.filter { it !in lyricsOrder }
@@ -253,9 +269,9 @@ object Stores {
     val queue = JsonStore(Paths.dir.resolve("queue.json"), ::PersistedQueue, PersistedQueue.serializer())
 
     init {
-        val normalized = settings.value.normalizeLegacyLtServerUrl()
-        if (normalized != settings.value) {
-            settings.update { normalized }
+        val migrated = settings.value.migrate().normalizeLegacyLtServerUrl()
+        if (migrated != settings.value) {
+            settings.update { migrated }
             settings.flush()
         }
     }

@@ -574,7 +574,11 @@ object Player {
             }
             currentCoroutineContext().ensureActive()
             if (!currentLoad(p, song.id, gen)) return
-            gain = if (Stores.settings.value.normalizeVolume) stream.loudnessDb?.let { 10.0.pow(-it / 20.0).coerceIn(0.7, 1.0) } ?: 1.0 else 1.0
+            // Gentle levelling only: never more than ~1.4 dB of attenuation and never a boost.
+            // The old 0.7 floor (-3 dB) was audible as the volume "suddenly dropping" on loud tracks.
+            gain = if (Stores.settings.value.normalizeVolume) {
+                stream.loudnessDb?.takeIf { it > 0.0 }?.let { 10.0.pow(-it / 20.0).coerceIn(0.85, 1.0) } ?: 1.0
+            } else 1.0
             lastClient = stream.clientName
             stream.audioUrl to stream.headers
         }

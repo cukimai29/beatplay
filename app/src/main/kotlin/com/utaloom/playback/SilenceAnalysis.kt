@@ -53,7 +53,7 @@ suspend fun analyze(
         val factoryOptions = listOf(
             "--no-video",
             "--no-audio-time-stretch",
-            "--no-audio-replay-gain",
+            "--audio-replay-gain-mode=none",
         ) + if (System.getenv("UTALOOM_DEBUG") == null) listOf("--quiet") else listOf("--verbose=1")
 
         val factory = MediaPlayerFactory(*factoryOptions.toTypedArray())

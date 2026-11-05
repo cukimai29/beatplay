@@ -45,12 +45,23 @@ jobs:
             Invoke-WebRequest -Uri "https://get.videolan.org/vlc/3.0.21/win64/vlc-3.0.21-win64.exe" -OutFile $installer
             Start-Process -FilePath $installer -ArgumentList "/S" -Wait
           }
+      - name: Locate VLC (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vlc = "C:\Program Files\VideoLAN\VLC"
+          if (-not (Test-Path "$vlc\libvlc.dll")) { throw "VLC was installed but libvlc.dll is missing from $vlc" }
+          "VLC_PATH=$vlc" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Test
         timeout-minutes: 15
         shell: bash
         env:
           UTALOOM_WM_ARTIFACTS: ${{ github.workspace }}/app/build/acceptance/fullscreen
-        run: bash ./gradlew :shared:jvmTest :app:test :app:playerSmoke --no-daemon
+        run: bash ./gradlew :shared:jvmTest :app:test --no-daemon
+      - name: Player smoke test
+        timeout-minutes: 10
+        shell: bash
+        run: bash ./gradlew :app:playerSmoke --no-daemon
       - uses: actions/upload-artifact@v4
         if: always()
         with:
