@@ -883,7 +883,8 @@ object Player {
         prepareFailed = null
         prepared?.engine?.release()
         prepared = null
-        fading?.release()
+        // The outgoing engine of a running blend belongs to its ramp job: cancelling that job
+        // releases it. Releasing it here too would race with the volume steps it still submits.
         fading = null
         crossfading = false
         blendLevel = null
@@ -990,8 +991,10 @@ object Player {
             }
             currentCoroutineContext().ensureActive()
             val factory = synchronized(Player) {
-                mixFactory ?: MediaPlayerFactory(*audioEngineOptions(backendPitch).toTypedArray()).also { mixFactory = it }
-            }
+                // Never spin up an engine for a Player that is going away.
+                if (mp == null) null
+                else mixFactory ?: MediaPlayerFactory(*audioEngineOptions(backendPitch).toTypedArray()).also { mixFactory = it }
+            } ?: return@launch
             val engine = runCatching { createAudioEngine(backendPitch, factory) }.getOrElse {
                 prepareFailed = song.id
                 return@launch
@@ -1099,13 +1102,10 @@ object Player {
             }
         } finally {
             blendLevel = null
-            val dropped = fading === outgoing
-            if (dropped) fading = null
             crossfading = false
-            if (dropped) {
-                runCatching { outgoing.stop() }
-                runCatching { outgoing.release() }
-            }
+            // This job owns the outgoing engine from the moment the blend starts.
+            runCatching { outgoing.stop() }
+            runCatching { outgoing.release() }
             if (mp === incoming) applyVolume()
         }
     }

@@ -5,9 +5,19 @@ import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SettingsTest {
+    @Test
+    fun automixIsOnByDefault() {
+        val defaults = Settings()
+        assertTrue("Automix must blend by default", defaults.gaplessPlayback)
+        assertTrue("The default blend must be a real crossfade", defaults.crossfadeSeconds > 0)
+        // Still a sane value for slower machines and for the settings chooser.
+        assertTrue(defaults.crossfadeSeconds <= 12)
+    }
+
     @Test
     fun romanizeLanguageListDefaultsAndParsing() {
         val supported = Romanization.SUPPORTED_LANGUAGES
