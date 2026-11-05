@@ -43,7 +43,9 @@ import com.utaloom.playback.Downloads
 import com.utaloom.playback.Player
 import com.utaloom.together.ListenTogether
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Restore the shared YouTube session after the platform has initialized its data directory. */
 fun applySession() {
@@ -122,9 +124,23 @@ fun BeatPlayApp(vlcError: String? = null, fullscreen: Boolean, onFullscreenChang
     }
     val importing by PlaylistImports.progress.collectAsState()
     LaunchedEffect(Unit) {
-        val update = withContext(Dispatchers.IO) { runCatching { com.utaloom.platform.Updates.check() }.getOrNull() } ?: return@LaunchedEffect
-        val r = snackbar.showSnackbar("BeatPlay ${update.tag_name} is available (you have ${com.utaloom.platform.Updates.current})", actionLabel = "Download", withDismissAction = true, duration = SnackbarDuration.Indefinite)
-        if (r == SnackbarResult.ActionPerformed) com.utaloom.platform.Updates.openDownloadHub()
+        // Old builds only check for updates when they launch, so a new release reaches
+        // them at the next start; running builds also re-check so nobody is left behind.
+        var shown: String? = null
+        while (true) {
+            val update = withContext(Dispatchers.IO) { runCatching { com.utaloom.platform.Updates.check() }.getOrNull() }
+            if (update != null && update.tag_name != shown) {
+                shown = update.tag_name
+                val r = withTimeoutOrNull(120_000) {
+                    snackbar.showSnackbar(
+                        "BeatPlay ${update.tag_name} is available (you have ${com.utaloom.platform.Updates.current})",
+                        actionLabel = "Download", withDismissAction = true, duration = SnackbarDuration.Indefinite,
+                    )
+                }
+                if (r == SnackbarResult.ActionPerformed) com.utaloom.platform.Updates.openDownloadHub()
+            }
+            delay(6 * 60 * 60 * 1000L)
+        }
     }
 
     BeatPlayTheme(seed, dark) {

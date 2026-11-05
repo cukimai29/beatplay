@@ -84,6 +84,8 @@ object Player {
     private var smartShuffleJob: Job? = null
     private var smartShuffleRevision = 0L
     @Volatile private var smartShuffleIds = emptySet<String>()
+    /** Song the current smart shuffle recommendations were seeded from. */
+    @Volatile private var smartShuffleSeed: String? = null
     @Volatile private var gain = 1.0
     @Volatile private var pendingSeek: Long? = null
     @Volatile private var playWhenReady = true
@@ -153,6 +155,7 @@ object Player {
         if (songs.isEmpty() || remoteControlled && !fromRemote) return
         cancelSmartShuffle()
         smartShuffleIds = emptySet()
+        smartShuffleSeed = null
         originalOrder = null
         radioEndpoint = radio
         radioContinuation = null
@@ -164,8 +167,9 @@ object Player {
     /** Play a single song and fill the queue with a YouTube Music radio for it. */
     fun playRadio(song: Song) {
         if (remoteControlled) return
-        playQueue(listOf(song), 0, title = "Radio: ${song.title}", radio = WatchEndpoint(videoId = song.id))
-        radioJob = scope.launch { extendRadio() }
+        // The song's own radio keeps the automatic queue inside the searched song's genre.
+        playQueue(listOf(song), 0, title = "Radio: ${song.title}", radio = RadioSeeds.song(song.id))
+        radioJob = scope.launch { extendRadio(song) }
     }
 
     @Synchronized fun startRadio(endpoint: WatchEndpoint, title: String?) {
@@ -189,7 +193,7 @@ object Player {
         }
     }
 
-    private suspend fun extendRadio() {
+    private suspend fun extendRadio(seed: Song? = null) {
         if (remoteControlled) return
         val ep = radioEndpoint ?: return
         val gen = generation.get()
@@ -198,7 +202,9 @@ object Player {
             if (remoteControlled || gen != generation.get()) return@onSuccess
             radioContinuation = r.continuation
             val have = _state.value.queue.map { it.id }.toSet()
-            val add = r.items.map { it.toSong() }.filter { it.id !in have }
+            val fresh = r.items.map { it.toSong() }.filter { it.id !in have }
+            // Keep the automatic queue close to the searched song's genre.
+            val add = seed?.let { RadioSeeds.order(it, fresh) } ?: fresh
             if (add.isNotEmpty()) {
                 _state.update { it.copy(queue = it.queue + add) }
                 notifyQueue()
@@ -250,6 +256,7 @@ object Player {
     @Synchronized fun setQueueFromRemote(songs: List<Song>, currentId: String?) {
         cancelSmartShuffle()
         smartShuffleIds = emptySet()
+        smartShuffleSeed = null
         originalOrder = null
         val idx = songs.indexOfFirst { it.id == currentId }
         _state.update { it.copy(queue = songs, index = if (idx >= 0) idx else it.index.coerceAtMost(songs.lastIndex), shuffle = false) }
@@ -306,43 +313,55 @@ object Player {
         val queue = s.queue.filter { it.id !in smartShuffleIds || it.id == s.current?.id }
         _state.update { it.copy(queue = queue, index = queue.indexOfFirst { song -> song.id == s.current?.id }) }
         smartShuffleIds = smartShuffleIds.intersect(setOfNotNull(s.current?.id))
+        smartShuffleSeed = null
         notifyQueue()
     }
 
     // ponytail: one bounded radio batch per finite queue, paginate only if continuous discovery is needed.
     private fun startSmartShuffle() {
         val s = _state.value
-        if (remoteControlled || !Stores.settings.value.smartShuffle || !s.shuffle || radioEndpoint != null ||
-            smartShuffleJob?.isActive == true || s.queue.any { it.id in smartShuffleIds }
-        ) return
+        if (remoteControlled || !Stores.settings.value.smartShuffle || !s.shuffle || radioEndpoint != null) return
         val seed = s.current ?: return
+        if (smartShuffleJob?.isActive == true) return
+        if (smartShuffleSeed == seed.id && s.queue.any { it.id in smartShuffleIds }) return
         val revision = smartShuffleRevision
         val count = (s.queue.size / 3).coerceIn(1, 30)
         smartShuffleJob = scope.launch {
             try {
-                val result = withTimeout(30_000) {
-                    YouTube.next(WatchEndpoint(videoId = seed.id, playlistId = "RDAMVM${seed.id}")).getOrThrow()
-                }
+                // The song's own radio, so mixed recommendations follow the seed song's genre.
+                val result = withTimeout(30_000) { YouTube.next(RadioSeeds.song(seed.id)).getOrThrow() }
                 currentCoroutineContext().ensureActive()
                 synchronized(Player) {
                     val live = _state.value
                     if (revision != smartShuffleRevision || remoteControlled || !live.shuffle ||
-                        !Stores.settings.value.smartShuffle || live.current == null || radioEndpoint != null
+                        !Stores.settings.value.smartShuffle || live.current == null || radioEndpoint != null ||
+                        live.current?.id != seed.id
                     ) return@synchronized
-                    val have = live.queue.map { it.id }.toSet()
+                    val current = live.current ?: return@synchronized
+                    val keepCurrentRecommendation = current.id in smartShuffleIds
+                    // Drop the previous seed's leftovers so the mix follows this song's genre.
+                    val base = live.queue.filter { it.id !in smartShuffleIds || it.id == current.id }
+                    val currentIndex = base.indexOfFirst { it.id == current.id }
+                    val have = base.map { it.id }.toSet()
                     val additions = result.items.map { it.toSong() }
                         .filter { it.id !in have && (!Stores.settings.value.hideExplicit || !it.explicit) }
                         .distinctBy { it.id }.take(count)
-                    if (additions.isEmpty()) return@synchronized
-                    val queue = live.queue.take(live.index + 1).toMutableList()
+                    if (additions.isEmpty()) {
+                        smartShuffleIds = if (keepCurrentRecommendation) setOf(current.id) else emptySet()
+                        return@synchronized
+                    }
+                    val queue = base.take(currentIndex + 1).toMutableList()
                     val recommendations = additions.iterator()
-                    live.queue.drop(live.index + 1).forEachIndexed { i, song ->
+                    base.drop(currentIndex + 1).forEachIndexed { i, song ->
                         queue += song
                         if ((i + 1) % 3 == 0 && recommendations.hasNext()) queue += recommendations.next()
                     }
                     recommendations.forEachRemaining { queue += it }
-                    smartShuffleIds = additions.map { it.id }.toSet()
-                    _state.update { it.copy(queue = queue) }
+                    smartShuffleIds = additions.mapTo(HashSet()) { it.id }.apply {
+                        if (keepCurrentRecommendation) add(current.id)
+                    }
+                    smartShuffleSeed = seed.id
+                    _state.update { it.copy(queue = queue, index = currentIndex) }
                     notifyQueue()
                 }
             } catch (e: CancellationException) {
@@ -351,6 +370,20 @@ object Player {
                 System.err.println("Smart shuffle unavailable, keeping normal shuffle: ${e.message}")
             }
         }
+    }
+
+    /**
+     * Re-seeds smart shuffle when playback moves on to a song of a different genre,
+     * so the mixed recommendations keep matching whatever is playing now.
+     */
+    private fun maybeRefreshSmartShuffle() {
+        val s = _state.value
+        if (remoteControlled || !Stores.settings.value.smartShuffle || !s.shuffle || radioEndpoint != null) return
+        val seed = s.current ?: return
+        if (smartShuffleSeed == seed.id || smartShuffleJob?.isActive == true) return
+        // Only once the previous seed's recommendations have been played through.
+        if (s.queue.drop(s.index + 1).count { it.id in smartShuffleIds } > 1) return
+        startSmartShuffle()
     }
 
     fun cycleRepeat() {
@@ -551,6 +584,8 @@ object Player {
         if (notify && !remoteControlled) _state.value.let { hooks?.onTrackChanged(song, it.queue, it.index) }
         persist()
         loadJob = scope.launch { startMedia(p, song, gen) }
+        // Automatic shuffle recommendations follow the genre of the song now playing.
+        maybeRefreshSmartShuffle()
     }
 
     private fun currentLoad(p: AudioEngine, songId: String, gen: Long): Boolean =

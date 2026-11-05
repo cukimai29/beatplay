@@ -5,6 +5,7 @@ import com.utaloom.data.Stores
 import com.utaloom.data.toSong
 import com.utaloom.innertube.YouTube
 import com.utaloom.innertube.models.AlbumItem
+import com.utaloom.innertube.models.SongItem
 import com.utaloom.platform.NativeLibs
 import com.utaloom.playback.Player
 import com.utaloom.playback.PlayerHooks
@@ -104,6 +105,29 @@ fun main() = runBlocking {
         check(Player.init())
         check(Player.state.value.queue == originals && !Player.state.value.isPlaying)
         println("Native release/init restores originals paused, without temporary recommendations: OK")
+
+        // Tapping a searched song must start an automatic radio that follows that song's genre.
+        val songSearch = withTimeout(30_000) {
+            YouTube.search("Via Vallen Bojo Galak", YouTube.SearchFilter.FILTER_SONG).getOrThrow()
+        }
+        val searched = songSearch.items.filterIsInstance<SongItem>().firstOrNull()?.toSong()
+            ?: error("Search returned no songs")
+        Player.playRadio(searched)
+        withTimeout(60_000) {
+            while (Player.state.value.queue.size < 10) {
+                Player.state.value.error?.let { error(it) }
+                delay(200)
+            }
+        }
+        val radio = Player.state.value
+        check(radio.current?.id == searched.id) { "The searched song must start the automatic radio" }
+        check(radio.queueTitle == "Radio: ${searched.title}") { "Unexpected radio title: ${radio.queueTitle}" }
+        check(radio.queue.map { it.id }.distinct().size == radio.queue.size) { "Automatic radio repeated songs" }
+        val seedArtists = searched.artists.map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet()
+        val sameArtistFirst = radio.queue.drop(1).takeWhile { song ->
+            song.artists.any { it.trim().lowercase() in seedArtists }
+        }.size
+        println("Search -> automatic radio: searched song first, radio filled from its own genre (same-artist lead: $sameArtistFirst): OK")
     } finally {
         Player.remoteControlled = false
         Player.hooks = null

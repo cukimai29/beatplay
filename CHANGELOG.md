@@ -1,5 +1,11 @@
 # Changelog
 
+## [v1.5.4] - 2026-11-05
+
+* Genre-matched automatic shuffle: searching a song now starts that song's own YouTube Music radio, seeded with the same artist first so the automatic queue follows the song's genre
+* Smart shuffle recommendations are re-seeded whenever playback moves to a song of a different genre
+* Update check now repeats while the app runs, so older installs are notified about the newest release without restarting
+
 ## [v1.5.3] - 2026-11-05
 
 * Release 1.5.3: stop playback on close, fix volume drops, new logo, lighter UI (9252595)
