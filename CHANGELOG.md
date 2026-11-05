@@ -1,5 +1,10 @@
 # Changelog
 
+## [v1.5.6] - 2026-11-06
+
+* Fixed a crash (libVLC access violation) when the queue changed while a track was still blending into the next one. The ramp job now owns the outgoing engine, and preparing a track never spins up an engine for a Player that is going away.
+* The Automix CI check uses local tones instead of YouTube streams, because GitHub runners sit on IPs YouTube will not serve audio to.
+
 ## [v1.5.5] - 2026-11-06
 
 * Automix: tracks blend into each other with no gap, like Apple Music. The next track is resolved and buffered while the current one plays, then the two overlap (3s crossfade by default, or a seamless switch with no fade). Ads still play before the track they belong to, and Listen Together rooms keep the old behaviour.
