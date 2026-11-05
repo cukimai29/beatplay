@@ -163,6 +163,13 @@ tasks.register<JavaExec>("smartShuffleAcceptance") {
     environment("APPDATA", layout.buildDirectory.dir("smart-shuffle-data").get().asFile.absolutePath)
 }
 
+tasks.register<JavaExec>("automixAcceptance") {
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.utaloom.AutomixAcceptanceKt")
+    environment("XDG_DATA_HOME", layout.buildDirectory.dir("automix-data").get().asFile.absolutePath)
+    environment("APPDATA", layout.buildDirectory.dir("automix-data").get().asFile.absolutePath)
+}
+
 tasks.register<JavaExec>("networkSmoke") {
     classpath = sourceSets["test"].runtimeClasspath
     mainClass.set("com.utaloom.PlayerSmokeKt")

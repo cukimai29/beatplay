@@ -15,7 +15,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import com.utaloom.data.Stores
+import com.utaloom.playback.Automix
 import com.utaloom.playback.Player
+import com.utaloom.playback.TrackTransition
 import com.utaloom.shared.cookieError
 import com.utaloom.innertube.YouTube
 import com.utaloom.innertube.models.YouTubeLocale
@@ -70,6 +72,54 @@ private suspend fun signInWithCookie(cookie: String) {
             YouTube.dataSyncId = oldDataSync
             YouTube.authUser = oldAuthUser
         }
+    }
+}
+
+/**
+ * Automix: how one track hands over to the next. Crossfade lengths are the seconds the two
+ * tracks overlap; "seamless" switches with no silence and no audible fade; "off" is a plain
+ * switch with the usual short silence.
+ */
+@Composable
+private fun TransitionSettings(transition: TrackTransition, crossfadeSeconds: Int, onChange: (TrackTransition, Int) -> Unit) {
+    val lengths = listOf(1, 2, 3, 4, 6, 8, 12)
+    Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Automix", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Blend the end of each track into the start of the next so there is never a gap, the way Apple Music does it.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = transition == TrackTransition.OFF,
+                onClick = { onChange(TrackTransition.OFF, 0) },
+                label = { Text("Off") },
+            )
+            FilterChip(
+                selected = transition == TrackTransition.SEAMLESS,
+                onClick = { onChange(TrackTransition.SEAMLESS, 0) },
+                label = { Text("Seamless") },
+            )
+            lengths.forEach { seconds ->
+                FilterChip(
+                    selected = transition == TrackTransition.CROSSFADE && crossfadeSeconds == seconds,
+                    onClick = { onChange(TrackTransition.CROSSFADE, seconds) },
+                    label = { Text("${seconds}s") },
+                )
+            }
+        }
+        Text(
+            when (transition) {
+                TrackTransition.OFF -> "Tracks switch with a short silence between them."
+                TrackTransition.SEAMLESS -> "Tracks switch with no silence and no fade."
+                else -> "The last ${crossfadeSeconds}s of a track fade into the first ${crossfadeSeconds}s of the next one."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -197,6 +247,16 @@ fun SettingsScreen(isMobile: Boolean = System.getProperty("java.vm.name") == "Da
         item { HorizontalDivider(Modifier.padding(horizontal = 24.dp)); SectionTitle("Playback") }
         item { SettingsChoice("Audio quality", "Applies when loading the next track. Downloads use high quality.", s.audioQuality, listOf("AUTO" to "Automatic", "HIGH" to "High", "LOW" to "Low")) { v -> Stores.settings.update { it.copy(audioQuality = v) } } }
         item { SettingsToggle("Volume normalization", "Gently level tracks that are louder than YouTube's target (at most −1.4 dB). Off by default so the volume you set stays where you set it.", s.normalizeVolume) { v -> Stores.settings.update { it.copy(normalizeVolume = v) } } }
+        item {
+            TransitionSettings(
+                Automix.transitionOf(s.crossfadeSeconds, s.gaplessPlayback),
+                s.crossfadeSeconds.coerceIn(0, 12),
+            ) { transition, seconds ->
+                Stores.settings.update {
+                    it.copy(gaplessPlayback = transition.enabled, crossfadeSeconds = if (transition == TrackTransition.CROSSFADE) seconds else 0)
+                }
+            }
+        }
         item { SettingsToggle("Smart shuffle", "Mix a recommended song after every three songs while shuffling playlists and albums.", s.smartShuffle, Player::setSmartShuffle) }
         if (!isMobile) item { PlaybackSettings() }
         if (!isMobile) item {

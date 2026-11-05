@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import uk.co.caprica.vlcj.factory.MediaPlayerFactory
 import java.io.File
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.pow
@@ -93,10 +94,24 @@ object Player {
     @Volatile private var loadedId: String? = null
     private var radioEndpoint: WatchEndpoint? = null
     private var radioContinuation: String? = null
-    data class PreparedTrack(val song: Song, val engine: AudioEngine, val gen: Long)
+    data class PreparedTrack(
+        val song: Song,
+        val engine: AudioEngine,
+        val gen: Long,
+        val gain: Double = 1.0,
+        val client: String? = null,
+    )
     @Volatile private var prepared: PreparedTrack? = null
     @Volatile private var fading: AudioEngine? = null
     @Volatile private var crossfading = false
+    /** Fade-in level of the incoming track while two engines overlap. Null outside a blend. */
+    @Volatile private var blendLevel: Float? = null
+    /** Next track that could not be preloaded: one attempt per track is enough. */
+    @Volatile private var prepareFailed: String? = null
+    /** libVLC instance shared by the outgoing and incoming engines during a blend. */
+    private var mixFactory: MediaPlayerFactory? = null
+    private var prepareJob: Job? = null
+    private var transitionJob: Job? = null
     private var audioJob: Job? = null
     private var backendPitch = 0
     private var listeningSong: Song? = null
@@ -126,6 +141,7 @@ object Player {
 
     fun release() {
         val old: AudioEngine?
+        val factory: MediaPlayerFactory?
         synchronized(this) {
             persist()
             finishListening()
@@ -135,9 +151,12 @@ object Player {
             sleepJob?.cancel(); persistJob?.cancel(); audioJob?.cancel()
             old = mp
             mp = null; events = null
+            factory = mixFactory
+            mixFactory = null
         }
         // release may wait for backend event dispatch, so never hold Player's monitor here.
         old?.release()
+        runCatching { factory?.release() }
     }
 
     private fun cancelLoading() {
@@ -413,6 +432,8 @@ object Player {
         }
         val gen = generation.get()
         p.submit { if (gen == generation.get() && p === mp) p.play() }
+        // A blend that is still running keeps the outgoing engine alive until it fades out.
+        fading?.let { engine -> engine.submit { engine.play() } }
     }
 
     @Synchronized fun pause(fromRemote: Boolean = false) {
@@ -421,6 +442,7 @@ object Player {
         playWhenReady = false
         val gen = generation.get()
         p.submit { if (gen == generation.get() && p === mp) p.setPause(true) }
+        fading?.let { engine -> engine.submit { engine.setPause(true) } }
         _state.update { it.copy(isPlaying = false) }
         if (!fromRemote) hooks?.onPause(_state.value.positionMs)
     }
@@ -540,7 +562,7 @@ object Player {
     private fun applyVolume() {
         val p = mp ?: return
         val s = _state.value
-        val v = if (s.muted) 0 else (s.volume * gain).toInt().coerceIn(0, 150)
+        val v = if (s.muted) 0 else (s.volume * gain * (blendLevel ?: 1.0).toDouble()).toInt().coerceIn(0, 150)
         p.submit { p.setVolume(v) }
     }
 
@@ -721,6 +743,9 @@ object Player {
             if (!active()) return
             synchronized(Player) { accountListening() }
             _state.update { it.copy(isPlaying = false) }
+            // The track ended before the blend window was reached: start the buffered next
+            // track right now, so the listener only hears the engine switch.
+            pendingBlend()?.let { startBlend(it, Automix.SEAMLESS_MS); return }
             scope.launch {
                 if (!active()) return@launch
                 val s = Stores.settings.value
@@ -728,11 +753,11 @@ object Player {
                     val video = runCatching { com.utaloom.playback.AdVideo.resolveFile() }.getOrNull()
                     if (video != null) com.utaloom.premium.AdManager.setVideoAd(video.absolutePath)
                     runCatching { com.utaloom.premium.AdManager.showAdBlocking(s.adSeconds, "BeatPlay Premium — dengarkan tanpa jeda iklan.") }
-                    if (!active() || usePrepared(crossfadeMs = 0)) return@launch
+                    if (!active()) return@launch
                     next(auto = true)
                 } else {
                     Stores.settings.update { it.copy(songsSinceAd = com.utaloom.premium.AdGate.nextCounter(it.songsSinceAd)) }
-                    if (active() && !usePrepared(crossfadeMs = 0)) next(auto = true)
+                    if (active()) next(auto = true)
                 }
             }
         }
@@ -810,7 +835,7 @@ object Player {
             }
             val pitch = if (room) 0 else settings.playbackPitch.coerceIn(-12, 12)
             if (pitch != backendPitch) rebuildAudio(pitch)
-            advanceAudio()
+            automixTick()
         }
     }
 
@@ -821,6 +846,7 @@ object Player {
             Stores.settings.update { it.copy(playbackPitch = backendPitch) }
             return
         }
+        var staleFactory: MediaPlayerFactory? = null
         val swapped = synchronized(Player) {
             val desired = if (remoteControlled || hooks != null) 0 else Stores.settings.value.playbackPitch.coerceIn(-12, 12)
             if (old !== mp || pitch != desired) false else {
@@ -829,11 +855,15 @@ object Player {
                 mp = replacement
                 backendPitch = pitch
                 _state.update { it.copy(pitch = pitch) }
+                // The pitch filter is a factory option, so the blend engine needs a new one too.
+                staleFactory = mixFactory
+                mixFactory = null
                 load(playWhenReady, notify = false, startAt = _state.value.positionMs, countHistory = false)
                 true
             }
         }
         if (swapped) old.release() else replacement.release()
+        runCatching { staleFactory?.release() }
     }
 
     @Synchronized fun restoreAfterBackup() {
@@ -845,37 +875,242 @@ object Player {
         }
     }
 
-    private fun cancelTransitions() {
+    @Synchronized private fun cancelTransitions() {
+        transitionJob?.cancel()
+        prepareJob?.cancel()
+        transitionJob = null
+        prepareJob = null
+        prepareFailed = null
         prepared?.engine?.release()
         prepared = null
         fading?.release()
         fading = null
         crossfading = false
+        blendLevel = null
     }
 
     private fun analyzeSilence(mrl: String, headers: Map<String, String>, song: Song, gen: Long) {
         if (!Stores.settings.value.skipSilence) return
     }
 
-    private fun usePrepared(crossfadeMs: Long): Boolean {
-        return false
+    // region automix
+
+    /** Index of the track that plays after the current one, honouring repeat modes. */
+    private fun upcomingIndex(s: PlayerState): Int? = when {
+        s.index < s.queue.lastIndex -> s.index + 1
+        s.repeat == RepeatMode.ALL && s.queue.isNotEmpty() -> 0
+        else -> null
     }
 
-    private fun advanceAudio() {
+    /** Volume the current track is playing at, including the normalisation gain. */
+    private fun currentVolume(): Int {
         val s = _state.value
-        val settings = Stores.settings.value
-        if (remoteControlled || hooks != null || !s.isPlaying || s.durationMs <= 0) return
+        return if (s.muted) 0 else (s.volume * gain).toInt().coerceIn(0, 150)
+    }
+
+    /**
+     * Keeps the next track loaded and buffered, and starts the blend when the current
+     * track is close enough to its end. Without this the switch between tracks is silent
+     * for as long as the next stream takes to start.
+     */
+    private fun automixTick() {
+        val s = _state.value
+        if (remoteControlled || hooks != null || !s.isPlaying || s.isBuffering) return
+        if (s.repeat == RepeatMode.ONE) return
+        if (!automixAllowed()) return
+        val window = automixWindow()
+        val upcoming = upcomingIndex(s)?.let { s.queue.getOrNull(it) } ?: return
         val remaining = s.durationMs - s.positionMs
-        if (settings.crossfadeSeconds > 0 && remaining in 300..((settings.crossfadeSeconds * 1000L).coerceAtLeast(1000L))) {
-            if (!crossfading && s.hasNext) {
-                crossfading = true
-                scope.launch {
-                    next(auto = true)
-                    crossfading = false
-                }
-            }
+        if (remaining <= 0) return
+        if (Automix.shouldBlend(remaining, window)) {
+            val ready = prepared?.takeIf { it.song.id == upcoming.id } ?: return
+            // A coarse position tick can land inside the window late: blend over what is left
+            // so the outgoing track is never cut in the middle of its fade.
+            startBlend(ready, minOf(window, remaining).coerceAtLeast(1L))
+        } else if (Automix.shouldPrepare(remaining, window) && prepared?.song?.id != upcoming.id) {
+            prepareNext(upcoming)
         }
     }
+
+    /** False while ads still have to play, or while Automix is switched off. */
+    private fun automixAllowed(): Boolean {
+        if (remoteControlled || hooks != null) return false
+        val settings = Stores.settings.value
+        if (com.utaloom.premium.AdManager.isShowing()) return false
+        // Ads must still play before the track they belong to.
+        if (com.utaloom.premium.AdGate.shouldShowAd(settings.isPremium, settings.songsSinceAd, settings.adEveryNSongs)) return false
+        return Automix.transitionOf(settings.crossfadeSeconds, settings.gaplessPlayback).enabled
+    }
+
+    private fun automixWindow(): Long {
+        val settings = Stores.settings.value
+        val transition = Automix.transitionOf(settings.crossfadeSeconds, settings.gaplessPlayback)
+        return Automix.windowMs(transition, settings.crossfadeSeconds)
+    }
+
+    /**
+     * The buffered next track when Automix should hand over to it immediately. Used when a
+     * track ends before the blend window was reached, so the listener still never waits for
+     * the next stream to start.
+     */
+    private fun pendingBlend(): PreparedTrack? {
+        if (!automixAllowed()) return null
+        val s = _state.value
+        val upcoming = upcomingIndex(s)?.let { s.queue.getOrNull(it) } ?: return null
+        return prepared?.takeIf { it.song.id == upcoming.id }
+    }
+
+    /** Resolves and buffers the next track on a second engine so it can start instantly. */
+    private fun prepareNext(song: Song) {
+        if (prepareJob?.isActive == true) return
+        if (prepareFailed == song.id) return
+        prepareJob = scope.launch {
+            val settings = Stores.settings.value
+            val local = Stores.library.value.downloaded[song.id]?.let(::File)?.takeIf { it.exists() }
+            val mrl: String
+            val headers: Map<String, String>
+            var trackGain = 1.0
+            var client: String? = null
+            if (local != null) {
+                mrl = local.absolutePath
+                headers = emptyMap()
+            } else {
+                val quality = runCatching { AudioQuality.valueOf(settings.audioQuality) }.getOrDefault(AudioQuality.AUTO)
+                val stream = runCatching { StreamResolver.resolve(song.id, quality, allowBoundedRange = false) }.getOrElse {
+                    prepareFailed = song.id
+                    return@launch
+                }
+                currentCoroutineContext().ensureActive()
+                mrl = stream.audioUrl
+                headers = stream.headers
+                trackGain = if (settings.normalizeVolume) {
+                    stream.loudnessDb?.takeIf { it > 0.0 }?.let { 10.0.pow(-it / 20.0).coerceIn(0.85, 1.0) } ?: 1.0
+                } else 1.0
+                client = stream.clientName
+            }
+            currentCoroutineContext().ensureActive()
+            val factory = synchronized(Player) {
+                mixFactory ?: MediaPlayerFactory(*audioEngineOptions(backendPitch).toTypedArray()).also { mixFactory = it }
+            }
+            val engine = runCatching { createAudioEngine(backendPitch, factory) }.getOrElse {
+                prepareFailed = song.id
+                return@launch
+            }
+            val loaded = runCatching { engine.load(mrl, headers, startPaused = true) }.getOrDefault(false)
+            if (!loaded) {
+                prepareFailed = song.id
+                runCatching { engine.release() }
+                return@launch
+            }
+            val track = PreparedTrack(song, engine, generation.get(), trackGain, client)
+            synchronized(Player) {
+                val live = _state.value
+                val stillUpcoming = upcomingIndex(live)?.let { live.queue.getOrNull(it) }
+                if (stillUpcoming?.id != song.id || !live.isPlaying) {
+                    engine.release()
+                    return@synchronized
+                }
+                prepared?.engine?.release()
+                prepared = track
+                prepareFailed = null
+            }
+            updateAudioEffects()
+        }
+    }
+
+    /**
+     * Hands the queue over to the buffered next track while the two overlap, so the
+     * listener never hears a gap. The outgoing engine is released once the blend ends.
+     */
+    @Synchronized
+    private fun startBlend(ready: PreparedTrack, windowMs: Long) {
+        val outgoing = mp ?: return
+        if (crossfading) return
+        val index = upcomingIndex(_state.value) ?: return
+        val song = ready.song
+        val incoming = ready.engine
+        val gen = generation.incrementAndGet()
+        // Captured before the incoming track's gain replaces the current one.
+        val outgoingStart = currentVolume()
+        prepared = null
+        crossfading = true
+        fading = outgoing
+        // The outgoing engine stops reporting: the incoming track owns the state from now on.
+        events?.let { outgoing.removeListener(it) }
+        events = null
+        loadedId = null
+        loadedGeneration = -1
+        loadingId = null
+        readyFor = null
+        pendingSeek = null
+        retried = false
+        playWhenReady = true
+        gain = ready.gain
+        lastClient = ready.client
+        finishListening()
+        _state.update {
+            it.copy(
+                index = index,
+                isPlaying = true,
+                isBuffering = false,
+                positionMs = 0,
+                durationMs = (song.duration ?: 0) * 1000L,
+                error = null,
+            )
+        }
+        val current = _state.value.current
+        if (current != null) Library.addHistory(current)
+        Stores.settings.update { it.copy(songsSinceAd = com.utaloom.premium.AdGate.nextCounter(it.songsSinceAd)) }
+        persist()
+        current?.let { hooks?.onTrackChanged(it, _state.value.queue, _state.value.index) }
+        mp = incoming
+        val listener = Events(incoming, song.id, gen)
+        events = listener
+        incoming.addListener(listener)
+        loadedId = song.id
+        loadedGeneration = gen
+        updateAudioEffects()
+        maybeRefreshSmartShuffle()
+        // A radio queue keeps growing even while blends do the switching.
+        if (_state.value.queue.size - _state.value.index < 4) radioJob = scope.launch { extendRadio() }
+        transitionJob = scope.launch { rampBlend(windowMs, incoming, outgoing, outgoingStart) }
+    }
+
+    /** Ramps the incoming track up and the outgoing one down, then drops the outgoing engine. */
+    private suspend fun rampBlend(windowMs: Long, incoming: AudioEngine, outgoing: AudioEngine, outgoingStart: Int) {
+        // Silence first: the track was loaded paused, and the engine's own "playing" event
+        // would otherwise apply the full volume before the first ramp step lands.
+        blendLevel = 0f
+        incoming.submit {
+            incoming.setVolume(0)
+            incoming.play()
+        }
+        try {
+            val steps = (windowMs / Automix.STEP_MS).toInt().coerceAtLeast(1)
+            for (step in 1..steps) {
+                val progress = step.toFloat() / steps
+                blendLevel = Automix.fadeIn(progress)
+                applyVolume()
+                if (fading === outgoing) {
+                    val level = (outgoingStart * Automix.fadeOut(progress)).toInt()
+                    outgoing.submit { outgoing.setVolume(level) }
+                }
+                delay(Automix.STEP_MS)
+            }
+        } finally {
+            blendLevel = null
+            val dropped = fading === outgoing
+            if (dropped) fading = null
+            crossfading = false
+            if (dropped) {
+                runCatching { outgoing.stop() }
+                runCatching { outgoing.release() }
+            }
+            if (mp === incoming) applyVolume()
+        }
+    }
+
+    // endregion
 
     private fun restoreQueue() {
         val q = Stores.queue.value

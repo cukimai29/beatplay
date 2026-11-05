@@ -1,5 +1,11 @@
 # Changelog
 
+## [v1.5.5] - 2026-11-06
+
+* Automix: tracks blend into each other with no gap, like Apple Music. The next track is resolved and buffered while the current one plays, then the two overlap (3s crossfade by default, or a seamless switch with no fade). Ads still play before the track they belong to, and Listen Together rooms keep the old behaviour.
+* Settings → Playback: choose Off, Seamless, or a crossfade length.
+* Website redesign: dark warm editorial look, live version and file sizes from GitHub Releases, canvas waveform in the hero.
+
 ## [v1.5.4] - 2026-11-05
 
 * Genre-matched automatic shuffle: searching a song now starts that song's own YouTube Music radio, seeded with the same artist first so the automatic queue follows the song's genre

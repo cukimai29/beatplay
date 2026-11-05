@@ -62,6 +62,10 @@ jobs:
         timeout-minutes: 10
         shell: bash
         run: bash ./gradlew :app:playerSmoke --no-daemon
+      - name: Automix handover acceptance
+        timeout-minutes: 12
+        shell: bash
+        run: bash ./gradlew :app:automixAcceptance --no-daemon
       - uses: actions/upload-artifact@v4
         if: always()
         with:
