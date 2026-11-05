@@ -4,6 +4,7 @@ import com.sun.jna.Library
 import com.sun.jna.Native
 import com.sun.jna.Pointer
 import com.utaloom.data.Stores
+import java.util.concurrent.RejectedExecutionException
 import uk.co.caprica.vlcj.factory.MediaPlayerFactory
 import uk.co.caprica.vlcj.player.base.MediaPlayer
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
@@ -77,6 +78,9 @@ private class DesktopAudioEngine(
     private val listeners = mutableMapOf<AudioEngine.Listener, MediaPlayerEventAdapter>()
     private var lastEqEnabled = false
 
+    @Volatile
+    private var released = false
+
     init {
         syncAudioFilter(player, pitch, enabled = false)
     }
@@ -101,7 +105,18 @@ private class DesktopAudioEngine(
         listeners.remove(listener)?.let { player.events().removeMediaPlayerEventListener(it) }
     }
 
-    override fun submit(task: () -> Unit) { player.submit { task() } }
+    override fun submit(task: () -> Unit) {
+        // vlcj terminates the media player's executor on release, and Player keeps engines
+        // around that can still be handed work afterwards: the outgoing half of a finished
+        // blend, or a buffered next track. Rejecting that work must never reach the user as
+        // a crash dialog, so a dead engine simply drops what it is asked to do.
+        if (released) return
+        try {
+            player.submit { task() }
+        } catch (_: RejectedExecutionException) {
+            // Shut down between the check above and the submit: the work no longer matters.
+        }
+    }
     override fun play() { player.controls().play() }
     override fun setPause(paused: Boolean) { player.controls().setPause(paused) }
     override fun seek(positionMs: Long) { player.controls().setTime(positionMs) }
@@ -158,6 +173,7 @@ private class DesktopAudioEngine(
         try {
             player.release()
         } finally {
+            released = true
             if (ownsFactory) factory.release()
         }
     }

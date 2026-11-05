@@ -114,29 +114,10 @@ fun PlaybackSettings() {
         }
 
         HorizontalDivider(Modifier.padding(horizontal = 24.dp))
-        SectionTitle("Transitions & audio processing")
-
-        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Crossfade", style = MaterialTheme.typography.titleMedium)
-                Text(if (s.crossfadeSeconds == 0) "Off" else "${s.crossfadeSeconds}s", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Text("Fade out the end of the song while fading in the next one.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Slider(
-                value = s.crossfadeSeconds.toFloat(),
-                onValueChange = { sec -> Stores.settings.update { it.copy(crossfadeSeconds = sec.toInt()) } },
-                valueRange = 0f..12f,
-                steps = 11,
-            )
-        }
-
-        Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Gapless playback", style = MaterialTheme.typography.titleMedium)
-                Text("Preload and transition to the next track with minimal delay between songs.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Switch(s.gaplessPlayback, onCheckedChange = { gapless -> Stores.settings.update { it.copy(gaplessPlayback = gapless) } })
-        }
+        // Track transitions live in the Automix picker above; repeating them here let the two
+        // controls disagree (a crossfade value saved while gapless was off reads as "Off" in
+        // the picker, which is exactly the confusing state users reported).
+        SectionTitle("Audio processing")
 
         Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {

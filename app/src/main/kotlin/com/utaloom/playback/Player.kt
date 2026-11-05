@@ -1106,6 +1106,8 @@ object Player {
             // This job owns the outgoing engine from the moment the blend starts.
             runCatching { outgoing.stop() }
             runCatching { outgoing.release() }
+            // Drop the dead engine so play/pause/effects stop handing work to it.
+            if (fading === outgoing) fading = null
             if (mp === incoming) applyVolume()
         }
     }

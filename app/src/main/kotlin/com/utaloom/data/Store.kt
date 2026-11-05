@@ -20,6 +20,13 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
 
+/**
+ * Automix blend length in seconds. Used for fresh installs and for upgrades whose
+ * saved settings had Automix switched off, so the first track hand-over is already
+ * gapless instead of waiting for the user to find the setting.
+ */
+private const val DEFAULT_CROSSFADE_SECONDS = 2
+
 /** Serializable song snapshot used for library, history, playlists and the persisted queue. */
 @Serializable
 data class Song(
@@ -97,7 +104,7 @@ data class Settings(
     val equalizerPreset: String = "Flat",
     val equalizerPreamp: Float = 0f,
     val equalizerBands: List<Float> = List(10) { 0f },
-    val crossfadeSeconds: Int = 3,
+    val crossfadeSeconds: Int = DEFAULT_CROSSFADE_SECONDS,
     val gaplessPlayback: Boolean = true,
     val skipSilence: Boolean = false,
     val playbackSpeed: Float = 1f,
@@ -154,6 +161,12 @@ data class Settings(
             // 1.5.3: loudness normalization (up to -3 dB) and the full-window blur were both on by
             // default, which users experienced as volume randomly dropping and a heavy UI.
             s = s.copy(normalizeVolume = false, backgroundBlurEnabled = false, settingsSchema = 1)
+        }
+        if (s.settingsSchema < 2) {
+            // Automix is on out of the box: an install that saved it off keeps hearing a silent
+            // gap between tracks until the user finds the setting themselves.
+            s = if (s.gaplessPlayback) s.copy(settingsSchema = 2)
+            else s.copy(gaplessPlayback = true, crossfadeSeconds = DEFAULT_CROSSFADE_SECONDS, settingsSchema = 2)
         }
         return s
     }

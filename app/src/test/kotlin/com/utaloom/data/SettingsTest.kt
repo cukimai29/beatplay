@@ -91,10 +91,34 @@ class SettingsTest {
         val migrated = legacy.migrate()
         assertFalse(migrated.normalizeVolume)
         assertFalse(migrated.backgroundBlurEnabled)
-        assertEquals(1, migrated.settingsSchema)
+        assertEquals(2, migrated.settingsSchema)
 
         // A user who explicitly turns either option back on keeps that choice on later launches.
         val optedInAgain = migrated.copy(normalizeVolume = true, backgroundBlurEnabled = true)
         assertSame(optedInAgain, optedInAgain.migrate())
+    }
+
+    @Test
+    fun automixSwitchedOffIsTurnedOnOnce() {
+        // An install that saved Automix off keeps hearing a silent gap between tracks until the
+        // user finds the setting. The upgrade switches it on exactly once.
+        val off = Settings(gaplessPlayback = false, crossfadeSeconds = 0, settingsSchema = 1)
+        val migrated = off.migrate()
+        assertTrue(migrated.gaplessPlayback)
+        assertTrue("The upgrade must pick a real blend, not a silent switch", migrated.crossfadeSeconds > 0)
+        assertEquals(2, migrated.settingsSchema)
+
+        // A user who switches Automix back off keeps that choice on later launches.
+        val offAgain = migrated.copy(gaplessPlayback = false, crossfadeSeconds = 0)
+        assertSame(offAgain, offAgain.migrate())
+
+        // An install that already blends keeps the length it chose, including pure gapless.
+        val seamless = Settings(gaplessPlayback = true, crossfadeSeconds = 0, settingsSchema = 1)
+        val migratedSeamless = seamless.migrate()
+        assertEquals(0, migratedSeamless.crossfadeSeconds)
+        assertEquals(2, migratedSeamless.settingsSchema)
+
+        val blended = Settings(gaplessPlayback = true, crossfadeSeconds = 8, settingsSchema = 1)
+        assertEquals(8, blended.migrate().crossfadeSeconds)
     }
 }

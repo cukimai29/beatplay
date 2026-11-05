@@ -1,5 +1,12 @@
 # Changelog
 
+## [v1.5.7] - 2026-11-06
+
+* Fixed the "rejected from ThreadPoolExecutor[Terminated]" error dialog: an audio engine that has already been released no longer throws when it is handed one last task, which is what the outgoing half of a finished blend and a buffered next track both do.
+* Automix is on out of the box: tracks hand over with a 2s blend instead of a silent gap, and installs that saved it switched off are upgraded exactly once.
+* Settings → Playback: the duplicated Crossfade slider and Gapless switch are gone, so the Automix picker is the single place that decides track transitions. A crossfade length saved while gapless was off used to read back as "Off" in the picker.
+* New app icon and website logo: a gradient squircle carrying a white beat-pulse mark, generated once and rendered for every size the app and the site ship with (window, tray, Linux, Windows .ico, favicon, promo).
+
 ## [v1.5.6] - 2026-11-06
 
 * Fixed a crash (libVLC access violation) when the queue changed while a track was still blending into the next one. The ramp job now owns the outgoing engine, and preparing a track never spins up an engine for a Player that is going away.
