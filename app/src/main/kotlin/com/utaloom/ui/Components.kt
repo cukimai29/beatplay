@@ -352,8 +352,10 @@ fun SongRow(
     trailing: (@Composable () -> Unit)? = null,
 ) {
     var menu by remember { mutableStateOf(false) }
-    val liked by Stores.library.state.collectAsState()
-    val isLiked = liked.liked.any { it.id == song.id }
+    val library by Stores.library.state.collectAsState()
+    // Use a set for constant-time lookup instead of scanning all liked songs for every row.
+    val likedIds = remember(library.liked) { library.liked.asSequence().map { it.id }.toSet() }
+    val isLiked = song.id in likedIds
     val bg = if (playing) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent
     Row(
         modifier

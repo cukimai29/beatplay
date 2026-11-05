@@ -155,7 +155,12 @@ internal fun runApp(exitProcessOnExit: Boolean) {
         })
 
         Window(
-            onCloseRequest = { if (isTraySupported && settings.minimizeToTray && (player.current != null || importing != null)) visible = false else quit() },
+            onCloseRequest = {
+                // Default: closing the window always quits so audio can never keep playing with no visible window.
+                // Users who explicitly enable "Keep playing in tray" keep the old behaviour.
+                if (isTraySupported && settings.closeOnTray && (player.current != null || importing != null)) visible = false
+                else quit()
+            },
             visible = visible,
             state = windowState,
             title = player.current?.let { "${it.title} • ${it.artistText} - BeatPlay" } ?: "BeatPlay",

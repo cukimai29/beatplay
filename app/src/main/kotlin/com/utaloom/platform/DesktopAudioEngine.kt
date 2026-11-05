@@ -42,6 +42,7 @@ fun audioEngineOptions(pitch: Int = 0): List<String> {
         add("--no-video")
         add("--network-caching=1500")
         add("--audio-filter=$filterChain")
+        add("--no-audio-replay-gain")  // Disable libVLC's replay-gain to prevent unexpected volume changes
         if (boundedPitch != 0) {
             add("--pitch-shift=$boundedPitch")
         }

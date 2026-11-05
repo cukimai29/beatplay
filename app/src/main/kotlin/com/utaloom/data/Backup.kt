@@ -29,7 +29,7 @@ object Backup {
     private val safePreferences = setOf(
         "darkMode", "dynamicColor", "audioQuality", "volume", "normalizeVolume", "smartShuffle",
         "useLoginForBrowse", "contentLanguage", "contentCountry", "hideExplicit", "pauseHistory", "pauseSearchHistory",
-        "ltAutoApproveJoins", "ltAutoApproveSuggestions", "ltSyncVolume", "lyricsOrder", "lyricsDisabled", "lyricsTextSize", "minimizeToTray",
+        "ltAutoApproveJoins", "ltAutoApproveSuggestions", "ltSyncVolume", "lyricsOrder", "lyricsDisabled", "lyricsTextSize", "minimizeToTray", "closeOnTray", "backgroundBlurEnabled",
         "equalizerEnabled", "equalizerPreset", "equalizerPreamp", "equalizerBands", "crossfadeSeconds", "gaplessPlayback", "skipSilence",
         "playbackSpeed", "playbackPitch", "lastFmEnabled", "listenBrainzEnabled", "discordEnabled",
         "lyricsRomanize", "lyricsRomanizationLanguage", "lyricsRomanizeList", "lyricsRomanizeAsMain", "lyricsRomanizeCyrillicByLine",

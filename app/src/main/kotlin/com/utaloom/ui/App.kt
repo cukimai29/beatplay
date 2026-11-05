@@ -124,7 +124,7 @@ fun BeatPlayApp(vlcError: String? = null, fullscreen: Boolean, onFullscreenChang
     LaunchedEffect(Unit) {
         val update = withContext(Dispatchers.IO) { runCatching { com.utaloom.platform.Updates.check() }.getOrNull() } ?: return@LaunchedEffect
         val r = snackbar.showSnackbar("BeatPlay ${update.tag_name} is available (you have ${com.utaloom.platform.Updates.current})", actionLabel = "Download", withDismissAction = true, duration = SnackbarDuration.Indefinite)
-        if (r == SnackbarResult.ActionPerformed) com.utaloom.platform.Updates.open(update.html_url)
+        if (r == SnackbarResult.ActionPerformed) com.utaloom.platform.Updates.openDownloadHub()
     }
 
     BeatPlayTheme(seed, dark) {

@@ -574,7 +574,7 @@ object Player {
             }
             currentCoroutineContext().ensureActive()
             if (!currentLoad(p, song.id, gen)) return
-            gain = if (Stores.settings.value.normalizeVolume) stream.loudnessDb?.let { 10.0.pow(-it / 20.0).coerceAtMost(1.0) } ?: 1.0 else 1.0
+            gain = if (Stores.settings.value.normalizeVolume) stream.loudnessDb?.let { 10.0.pow(-it / 20.0).coerceIn(0.7, 1.0) } ?: 1.0 else 1.0
             lastClient = stream.clientName
             stream.audioUrl to stream.headers
         }

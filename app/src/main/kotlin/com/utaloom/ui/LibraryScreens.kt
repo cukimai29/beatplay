@@ -75,8 +75,22 @@ private suspend fun readPlaylistFile(): LocalPlaylist? = readPlaylistText(maxPla
 private suspend fun exportPlaylist(p: LocalPlaylist): Boolean =
     writePlaylistText(p.name, playlistJson.encodeToString(LocalPlaylist.serializer(), p))
 
-private fun knownSongs(lib: LibraryState): List<Song> =
-    (lib.history + lib.liked + lib.playlists.flatMap { it.songs } + lib.downloadedSongs.values + lib.songCatalog.values + Stores.queue.value.songs).distinctBy { it.id }
+private fun knownSongs(lib: LibraryState): List<Song> {
+    val seen = LinkedHashSet<String>()
+    val result = mutableListOf<Song>()
+    for (source in listOf(
+        lib.history, lib.liked,
+        lib.playlists.flatMap { it.songs },
+        lib.downloadedSongs.values,
+        lib.songCatalog.values,
+        Stores.queue.value.songs
+    )) {
+        for (song in source) {
+            if (seen.add(song.id)) result.add(song)
+        }
+    }
+    return result
+}
 
 private fun downloadedSongs(lib: LibraryState): List<Song> {
     val known = knownSongs(lib).associateBy { it.id }

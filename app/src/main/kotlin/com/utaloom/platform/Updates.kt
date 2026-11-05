@@ -40,6 +40,9 @@ object Updates {
         runCatching { Desktop.getDesktop().browse(URI(url)) }.onFailure { ProcessBuilder("xdg-open", url).start() }
     }
 
+    /** Open beatplay.wuaze.com (the official download hub) directly. */
+    fun openDownloadHub() = openExternal("https://beatplay.wuaze.com")
+
     /** Open any http(s) URL (payment pages, QR images). Throws IllegalArgumentException on bad URLs. */
     fun openExternal(url: String) {
         val uri = runCatching { URI(url) }.getOrNull()

@@ -91,6 +91,8 @@ data class Settings(
     val lyricsDisabled: Set<String> = setOf("LyricsPlus"),
     val lyricsTextSize: Int = 26,
     val minimizeToTray: Boolean = true,
+    val closeOnTray: Boolean = false, // if true, close button minimizes to tray; if false, closes app
+    val backgroundBlurEnabled: Boolean = true,
     val equalizerEnabled: Boolean = false,
     val equalizerPreset: String = "Flat",
     val equalizerPreamp: Float = 0f,

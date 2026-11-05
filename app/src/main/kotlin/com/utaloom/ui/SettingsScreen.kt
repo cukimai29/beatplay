@@ -156,7 +156,7 @@ fun SettingsScreen(isMobile: Boolean = System.getProperty("java.vm.name") == "Da
         item { HorizontalDivider(Modifier.padding(horizontal = 24.dp)); SectionTitle("Appearance") }
         item { SettingsChoice("Theme", "Follow your system or choose a fixed appearance.", s.darkMode, listOf("system" to "System", "dark" to "Dark", "light" to "Light")) { v -> Stores.settings.update { it.copy(darkMode = v) } } }
         item { SettingsToggle("Dynamic color", "Use the current track artwork for the app accent color.", s.dynamicColor) { v -> Stores.settings.update { it.copy(dynamicColor = v) } } }
-        if (!isMobile) item { SettingsToggle("Minimize to tray", "Keep BeatPlay running when you close its window, if a system tray is available.", s.minimizeToTray) { v -> Stores.settings.update { it.copy(minimizeToTray = v) } } }
+        if (!isMobile) item { SettingsToggle("Keep playing in tray", "Keep BeatPlay running and continue playback when you close its window, if a system tray is available.", s.closeOnTray) { v -> Stores.settings.update { it.copy(closeOnTray = v, minimizeToTray = v) } } }
         if (!isMobile) item {
             FlowRow(Modifier.padding(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(com.utaloom.platform.DesktopWindows::showMini) { Text("Open mini player") }
@@ -377,7 +377,7 @@ private fun UpdateRow() {
     }
     @Composable
     fun Actions() {
-        release?.let { r -> Button({ com.utaloom.platform.Updates.open(r.html_url) }) { Text("Download ${r.tag_name}") } }
+        release?.let { r -> Button({ com.utaloom.platform.Updates.openDownloadHub() }) { Text("Download ${r.tag_name}") } }
         OutlinedButton({
             busy = true
             scope.launch {
