@@ -1,5 +1,18 @@
 # Changelog
 
+## [v1.5.3] - 2026-11-05
+
+* Release 1.5.3: stop playback on close, fix volume drops, new logo, lighter UI (9252595)
+* Fix multiple bugs: window close, volume drops, logo, performance, and update notifications (ac52f8b)
+* Keep responsive images at natural aspect ratio (9569ad8)
+* Fix sticky nav and responsive section spacing (06ec258)
+* Refresh website design with subtle motion (a2bc59b)
+* Optimize site images with WebP (de4e423)
+* Add direct Android download resolver for MediaFire (bfb446d)
+* Switch Android download to MediaFire (93f923c)
+* Clarify in-place update on download page (9ce2731)
+* Update download page for BeatPlay Android 1.2.1 (1d164ba)
+
 ## [v1.5.2] - 2026-10-20
 
 * fix(desktop): fokus instance yang sudah berjalan, cegah dobel proses (1332d03)
