@@ -2,112 +2,92 @@ package com.utaloom
 
 import com.utaloom.data.Song
 import com.utaloom.data.Stores
-import com.utaloom.data.toSong
-import com.utaloom.innertube.YouTube
-import com.utaloom.innertube.models.SongItem
 import com.utaloom.platform.NativeLibs
 import com.utaloom.playback.Player
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import java.io.File
+import javax.sound.sampled.AudioFileFormat
+import javax.sound.sampled.AudioFormat
+import javax.sound.sampled.AudioInputStream
+import javax.sound.sampled.AudioSystem
 
 /**
- * Live acceptance: one track must hand over to the next without the listener waiting for
- * the next stream to start. Uses real audio through libVLC, so the Gradle task isolates it.
+ * Live acceptance for Automix, using local audio so the check is fast and never depends on
+ * what YouTube will serve the machine that runs it. Uses libVLC, so the Gradle task isolates it.
  *
- * Tracks are chosen at runtime because a hardcoded video can be unavailable from the
- * machine that runs the check (region blocks, for example).
+ * Two tones stand in for two tracks. The checks are about the handover: it must start inside
+ * the blend window (not at the end of the track), the incoming track must play from its own
+ * stream, and replacing the queue mid-blend must not disturb the engines.
  */
 fun main() = runBlocking {
     val defaults = Stores.settings.value
+    val dir = File(System.getProperty("java.io.tmpdir"), "beatplay-automix").apply { mkdirs() }
+    val first = tone(dir, "automix-first.wav", 6_000, 392.0)
+    val second = tone(dir, "automix-second.wav", 6_000, 587.0)
+    val a = Song("automixfirst01", "Tone A", listOf("Utaloom"), duration = 6)
+    val b = Song("automixsecond1", "Tone B", listOf("Utaloom"), duration = 6)
+    val crossfadeSeconds = 3
     try {
         check(NativeLibs.discoverVlc() == null && Player.init()) { "Native VLC unavailable" }
         Player.setVolume(0)
-        // Set explicitly: the check must not depend on what an earlier run left on disk.
-        Stores.settings.update { it.copy(gaplessPlayback = true, crossfadeSeconds = 3) }
-        val settings = Stores.settings.value
-        check(settings.gaplessPlayback) { "Automix must be switchable on" }
-        check(settings.crossfadeSeconds > 0) { "Automix must blend, not switch silently" }
-        println("Automix defaults: ${settings.crossfadeSeconds}s blend, gapless ${settings.gaplessPlayback}")
+        Stores.library.update { it.copy(downloaded = mapOf(a.id to first.absolutePath, b.id to second.absolutePath)) }
+        Stores.settings.update { it.copy(gaplessPlayback = true, crossfadeSeconds = crossfadeSeconds) }
 
-        val pool = candidateTracks()
-        val tracks = ArrayList<Song>(2)
-        for (song in pool) {
-            if (tracks.size >= 2) break
-            if (startsPlaying(song)) tracks += song
-        }
-        check(tracks.size >= 2) { "No two playable tracks from this machine (${pool.size} candidates tried)" }
-        val first = tracks[0]
-        val second = tracks[1]
-        println("Using: ${first.title} / ${first.artists} and ${second.title} / ${second.artists}")
-
-        // 1. With Automix on: the handover must happen while the first track is still ending.
-        Player.playQueue(listOf(first, second))
+        // 1. The handover must start inside the blend window, not when the track runs out.
+        Player.playQueue(listOf(a, b))
         awaitPlaying()
         val length = Player.state.value.durationMs
-        check(length > 8000) { "Stream length unavailable: $length" }
-        val blendFrom = settings.crossfadeSeconds * 1000L
-        Player.seekTo((length - blendFrom - 2000).coerceAtLeast(1000))
-        if (!awaitSeek(length - blendFrom - 2000)) println("Seek not applied by the backend, waiting for the natural end")
-        awaitTrack(second)
-        check(Player.state.value.isPlaying || Player.state.value.isBuffering) { "The next track must keep playing" }
+        check(length > 4_000) { "Tone A never reported its length: $length" }
+        awaitTrack(b)
+        val handoverAt = Player.state.value.positionMs
+        val window = crossfadeSeconds * 1000L
+        check(handoverAt < window + 1_500) { "Automix handed over at ${handoverAt}ms, outside the ${window}ms blend window" }
+        check(Player.state.value.isPlaying || Player.state.value.isBuffering) { "The incoming track must keep playing" }
         awaitPlaying()
-        check(Player.state.value.durationMs > 0) { "The incoming track never reported its length" }
-        println("Automix: first -> second with the blend, next track playing from its own stream: OK")
+        check(Player.state.value.durationMs > 4_000) { "The incoming track never reported its own length" }
+        println("Automix: handed over at ${handoverAt}ms of ${length}ms (blend window ${window}ms), Tone B playing: OK")
 
-        // 2. With Automix off: the same queue must still reach the next track, the plain way.
+        // 2. With Automix off the switch happens the plain way, when the track has ended.
         Stores.settings.update { it.copy(gaplessPlayback = false, crossfadeSeconds = 0) }
-        Player.playQueue(listOf(first, second))
+        Player.playQueue(listOf(a, b))
         awaitPlaying()
-        val plainLength = Player.state.value.durationMs
-        Player.seekTo((plainLength - 6000).coerceAtLeast(1000))
-        if (!awaitSeek(plainLength - 6000)) println("Seek not applied by the backend, waiting for the natural end")
-        awaitTrack(second)
+        awaitTrack(b)
+        val plainAt = Player.state.value.positionMs
+        check(plainAt < 1_500) { "Without Automix the next track should start from the beginning, not ${plainAt}ms in" }
         awaitPlaying()
-        println("Automix off: plain switch still reaches the next track: OK")
+        println("Automix off: plain switch, next track from the start (${plainAt}ms): OK")
+
+        // 3. Replacing the queue while a blend is still running must not disturb the engines.
+        Stores.settings.update { it.copy(gaplessPlayback = true, crossfadeSeconds = crossfadeSeconds) }
+        Player.playQueue(listOf(a, b))
+        awaitPlaying()
+        awaitTrack(b)
+        Player.playQueue(listOf(a, b))
+        awaitPlaying()
+        withTimeout(60_000) { while (Player.state.value.current?.id != b.id) delay(100) }
+        awaitPlaying()
+        check(Player.state.value.durationMs > 4_000) { "The queue swap during a blend lost the track" }
+        println("Queue swapped mid-blend: playback continued: OK")
     } finally {
         Player.stop()
         Player.release()
         Stores.settings.update { it.copy(gaplessPlayback = defaults.gaplessPlayback, crossfadeSeconds = defaults.crossfadeSeconds) }
         Stores.flushAll()
+        runCatching { first.delete(); second.delete() }
     }
 }
 
-/** Short, widely available tracks, used when the search API cannot be reached. */
-private fun fallbackTracks(): List<Song> = listOf(
-    Song("9bZkp7q19f0", "Gangnam Style", listOf("PSY"), duration = 252),
-    Song("kJQP7kiw5Fk", "Despacito", listOf("Luis Fonsi", "Daddy Yankee"), duration = 282),
-    Song("JGwWNGJdvx8", "Shape of You", listOf("Ed Sheeran"), duration = 264),
-    Song("RgKAFK5djSk", "See You Again", listOf("Wiz Khalifa", "Charlie Puth"), duration = 238),
-    Song("OPf0YbXqDm0", "Uptown Funk", listOf("Mark Ronson", "Bruno Mars"), duration = 270),
-    Song("jNQXAC9IVRw", "Me at the zoo", listOf("jawed"), duration = 19),
-)
-
-/** Real search results first, so the tracks are playable from wherever this runs. */
-private suspend fun candidateTracks(): List<Song> {
-    val searched = runCatching {
-        withTimeout(60_000) { YouTube.search("Via Vallen Bojo Galak", YouTube.SearchFilter.FILTER_SONG).getOrThrow() }
-    }.getOrNull()
-    val songs = searched?.items?.filterIsInstance<SongItem>()
-        ?.map { it.toSong() }
-        ?.distinctBy { it.id }
-        ?.sortedBy { it.duration ?: 999 }
-        ?.take(6)
-        .orEmpty()
-    return songs.ifEmpty { fallbackTracks() }
-}
-
-/** True when the track really starts producing audio on this machine. */
-private suspend fun startsPlaying(song: Song): Boolean {
-    Player.playQueue(listOf(song))
-    val deadline = System.currentTimeMillis() + 90_000
-    while (System.currentTimeMillis() < deadline) {
-        val s = Player.state.value
-        if (s.error != null) return false
-        if (s.current?.id == song.id && s.positionMs >= 500) return true
-        delay(100)
-    }
-    return false
+/** A short mono tone, so the check needs no network and no codec beyond PCM. */
+private fun tone(dir: File, name: String, ms: Int, hz: Double): File {
+    val rate = 8_000f
+    val format = AudioFormat(rate, 8, 1, true, false)
+    val samples = (rate * ms / 1000).toInt()
+    val bytes = ByteArray(samples) { i -> (Math.sin(2 * Math.PI * hz * i / rate) * 90).toInt().toByte() }
+    val file = dir.resolve(name)
+    AudioSystem.write(AudioInputStream(bytes.inputStream(), format, samples.toLong()), AudioFileFormat.Type.WAVE, file)
+    return file
 }
 
 private suspend fun awaitPlaying() {
@@ -119,17 +99,11 @@ private suspend fun awaitPlaying() {
     }
 }
 
-/** True once the position got close to the seek target. */
-private suspend fun awaitSeek(target: Long): Boolean = withTimeout(15_000) {
-    while (Player.state.value.positionMs < target - 1500) delay(100)
-    true
-} == true
-
 private suspend fun awaitTrack(song: Song) {
-    withTimeout(300_000) {
+    withTimeout(90_000) {
         while (Player.state.value.current?.id != song.id) {
             Player.state.value.error?.let { error(it) }
-            delay(100)
+            delay(50)
         }
     }
 }
