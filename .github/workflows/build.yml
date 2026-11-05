@@ -57,7 +57,17 @@ jobs:
         shell: bash
         env:
           UTALOOM_WM_ARTIFACTS: ${{ github.workspace }}/app/build/acceptance/fullscreen
-        run: bash ./gradlew :shared:jvmTest :app:test --no-daemon
+        run: |
+          set +e
+          bash ./gradlew :shared:jvmTest :app:test --no-daemon
+          code=$?
+          for f in shared/build/test-results/test/*.xml app/build/test-results/test/*.xml; do
+            [ -f "$f" ] || continue
+            awk '/<testcase /{if (match($0, /name="[^"]+"/)) n=substr($0, RSTART+6, RLENGTH-7)} /<(failure|error)[ >]/{print n}' "$f" | sort -u | while read -r t; do
+              echo "::error::Test failed ($(uname -s)): $t in $(basename "$f" .xml)"
+            done
+          done
+          exit $code
       - name: Player smoke test
         timeout-minutes: 10
         shell: bash
