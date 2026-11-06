@@ -19,6 +19,19 @@ class SettingsTest {
     }
 
     @Test
+    fun freshInstallsLandOnTheOneFiveEightDefaults() {
+        val defaults = Settings()
+        // A fresh install must skip the historical migrations that used to turn
+        // these off, so the schema marker starts at the current default set.
+        assertEquals(3, defaults.settingsSchema)
+        assertEquals("HIGH", defaults.audioQuality)
+        assertTrue(defaults.normalizeVolume)
+        assertTrue(defaults.smartShuffle)
+        assertTrue(defaults.gaplessPlayback)
+        assertEquals(2, defaults.crossfadeSeconds)
+    }
+
+    @Test
     fun romanizeLanguageListDefaultsAndParsing() {
         val supported = Romanization.SUPPORTED_LANGUAGES
 
@@ -85,9 +98,9 @@ class SettingsTest {
 
     @Test
     fun legacyVolumeAndBlurDefaultsAreResetOnce() {
-        // 1.5.2 and older saved these defaults explicitly, so a default change alone would not fix
-        // existing installs. The first run of 1.5.3 resets them exactly once.
-        val legacy = Settings(normalizeVolume = true, backgroundBlurEnabled = true)
+        // Schema 0 installations use the historical defaults, so the old migration
+        // must still run for them even though fresh installs start at schema 3.
+        val legacy = Settings(normalizeVolume = true, backgroundBlurEnabled = true, settingsSchema = 0)
         val migrated = legacy.migrate()
         assertFalse(migrated.normalizeVolume)
         assertFalse(migrated.backgroundBlurEnabled)

@@ -72,10 +72,10 @@ data class LocalPlaylist(val id: String, val name: String, val songs: List<Song>
 data class Settings(
     val darkMode: String = "system", // system | dark | light
     val dynamicColor: Boolean = true,
-    val audioQuality: String = "AUTO", // AUTO | HIGH | LOW
+    val audioQuality: String = "HIGH", // AUTO | HIGH | LOW
     val volume: Int = 80,
-    val normalizeVolume: Boolean = false, // opt-in: per-track gain can sound like the volume "randomly" drops
-    val smartShuffle: Boolean = false,
+    val normalizeVolume: Boolean = true, // default on: quieter tracks stay audible, louder ones stop jumping out
+    val smartShuffle: Boolean = true,
     val cookie: String? = null,
     val visitorData: String? = null,
     val dataSyncId: String? = null,
@@ -145,9 +145,19 @@ data class Settings(
     val adSeconds: Int = 15,
     // Path file video iklan lokal. Kosong = pakai video bawaan (ad.mp4).
     val adVideoPath: String = "",
-    // Internal schema marker so bug fixes can reset settings that used to have harmful defaults.
-    val settingsSchema: Int = 0,
+    // Current defaults schema. Fresh installs start here and skip legacy migrations.
+    val settingsSchema: Int = 3,
 ) {
+    /** Apply the current fresh-install playback defaults in one place. */
+    internal fun applyCurrentDefaults(): Settings = copy(
+        audioQuality = "HIGH",
+        normalizeVolume = true,
+        smartShuffle = true,
+        gaplessPlayback = true,
+        crossfadeSeconds = DEFAULT_CROSSFADE_SECONDS,
+        settingsSchema = 3,
+    )
+
     internal fun normalizeLegacyLtServerUrl() =
         if (ltServerUrl.trim() == "wss://metrolist.caliph.dev/ws") copy(ltServerUrl = "wss://utaloom.caliph.dev/ws") else this
 

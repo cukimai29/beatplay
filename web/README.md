@@ -1,25 +1,22 @@
 # Web BeatPlay (landing page statis)
 
-Folder ini berisi `index.html`, `download.html`, dan gambar di `img/` — tanpa
-build step dan tanpa framework.
+Folder ini berisi `index.html`, `download.html`, stylesheet bersama di
+`assets/site.css`, dan gambar di `img/` — tanpa build step dan tanpa framework.
 
 ## Link Android
 
-Link APK ada di `download.html`:
+Link APK ada di `download.html` dan mengarah langsung ke GitHub Release:
 
-- `ANDROID_APK_URL` — endpoint `download-apk.php` (resolver MediaFire)
+- `ANDROID_APK_URL` — URL aset GitHub Release
 - `ANDROID_APK_NAME` — nama file yang ditampilkan
 - `ANDROID_APK_SIZE` — ukuran yang ditampilkan
 
 APK resmi saat ini:
-`https://www.mediafire.com/file/qh977ew8l7rqk0y/BeatPlay-1.2.1-android.apk/file`
+`https://github.com/cukimai29/beatplay/releases/download/android-v1.3.0/BeatPlay-1.3.0-android.apk`
 
-MediaFire gratis tidak memberi direct-download permanen. `download-apk.php`
-mengambil link CDN sementara dari halaman file MediaFire, lalu mengalihkan
-browser ke link itu. Bila gagal, browser diarahkan ke halaman file MediaFire
-sebagai fallback. Ganti `MEDIAFIRE_FILE_PAGE` di `download-apk.php` dan
-`ANDROID_APK_NAME`/`ANDROID_APK_SIZE` di `download.html` setiap kali ada APK
-baru. Unggah APK ke MediaFire lebih dulu.
+Jika ada APK baru, unggah ke release `android-v*`, lalu ganti tiga konstanta
+tersebut di `download.html`. CSS dan HTML perlu disalin ke `BeatPlay-website/`
+sebelum membuat archive deployment.
 
 ## Deploy InfinityFree
 
@@ -27,8 +24,8 @@ baru. Unggah APK ke MediaFire lebih dulu.
 2. Masuk ke folder `htdocs`. Hapus `index2.html` bawaan bila ada.
 3. Upload `BeatPlay-website.zip` ke `htdocs`.
 4. Klik kanan zip tersebut, pilih **Extract**, lalu hapus zip-nya. Pastikan
-   `index.html`, `download.html`, `download-apk.php`, dan folder `img/`
-   berada langsung di `htdocs` (bukan di dalam subfolder).
+   `index.html`, `download.html`, folder `img/`, dan folder `assets/` berada
+   langsung di `htdocs` (bukan di dalam subfolder).
 5. Buka domainnya, cek halaman utama dan tab **Android → Download**.
 6. Buka **SSL/TLS → Free SSL Certificates**, pilih domain, lalu install
    sertifikat gratis.

@@ -1,94 +1,74 @@
 """BeatPlay brand assets.
 
-One design, every asset: the app icon (Compose window + tray, Linux package,
-Windows .ico), the website favicon/brand mark and the promo logo are all rendered
-from the same rounded-square "beat" mark, so they can never drift apart again.
+One design, every asset. Everything is rendered from the canonical logo at
+``web/img/logobaru.jpeg`` so the app icon (Compose window + tray, Linux package,
+Windows .ico), the Android launcher, the website favicon/brand lockup and the
+promo mark can never drift apart again.
 
 Run:  python make_logo.py
 """
-from PIL import Image, ImageDraw, ImageFilter
+from __future__ import annotations
+
+import base64
+import io
 import os
 
+from PIL import Image, ImageDraw
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
+SOURCE = os.path.join(ROOT, "web", "img", "logobaru.jpeg")
 
-# ---------------------------------------------------------------- design ----
-BASE = 512          # design units
-S = 4               # supersampling: render at 2048, then downsample
-SIZE = BASE * S
+# The emblem sits above the wordmark. This square crop keeps the full neon glow
+# and stops just before the "BeatPlay" letters.
+EMBLEM_CROP = (258, 0, 1278, 1020)
+# Emblem + wordmark, with a little breathing room.
+LOCKUP_CROP = (121, 98, 1415, 1259)
 
-INDIGO = (99, 102, 241)    # #6366F1  top-left of the tile
-PURPLE = (168, 85, 247)    # #A855F7  bottom-right of the tile
-WHITE = (255, 255, 255)
-
-TILE_RADIUS = 113 * S      # squircle corner radius
-
-# Four capsule bars: a rising pulse that settles. Heights are fractions of the
-# tallest bar, so the rhythm stays identical at every output size.
-BARS = (0.466, 0.754, 1.000, 0.636)
-BAR_W = 58 * S
-GAP = 28 * S
-MAX_H = 236 * S
+# The rounded-square app tile uses the same corner ratio as a squircle.
+TILE_RADIUS_RATIO = 0.225
+ICON_SIZE = 1024
+WEB_ICON_SIZE = 512
 
 
-def _tile_mask(size: int) -> Image.Image:
+def load_source() -> Image.Image:
+    if not os.path.exists(SOURCE):
+        raise SystemExit(f"Logo source not found: {SOURCE}")
+    return Image.open(SOURCE).convert("RGB")
+
+
+def rounded_icon(size: int = ICON_SIZE) -> Image.Image:
+    """Square emblem tile with transparent rounded corners."""
+    src = load_source().crop(EMBLEM_CROP).resize((size, size), Image.LANCZOS)
     mask = Image.new("L", (size, size), 0)
     ImageDraw.Draw(mask).rounded_rectangle(
-        [0, 0, size - 1, size - 1], radius=TILE_RADIUS * size // SIZE, fill=255)
-    return mask
+        [0, 0, size - 1, size - 1],
+        radius=int(size * TILE_RADIUS_RATIO),
+        fill=255,
+    )
+    out = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    out.paste(src, (0, 0), mask)
+    return out
 
 
-def rounded_tile(size: int) -> Image.Image:
-    """Gradient squircle with a soft sheen, transparent outside the corners."""
-    # Diagonal gradient: build it small, upscale for a smooth ramp.
-    steps = 160
-    rows = []
-    for y in range(steps):
-        ty = y / (steps - 1)
-        for x in range(steps):
-            t = (x / (steps - 1) + ty) / 2
-            rows.append(tuple(int(INDIGO[i] + (PURPLE[i] - INDIGO[i]) * t) for i in range(3)))
-    grad = Image.new("RGB", (steps, steps))
-    grad.putdata(rows)
-    grad = grad.resize((size, size), Image.BILINEAR)
+def lockup() -> Image.Image:
+    """Emblem + wordmark with the near-black JPEG background keyed to alpha.
 
-    tile = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    tile.paste(grad, (0, 0), _tile_mask(size))
+    The alpha comes from the brightest channel (the JPEG background is
+    near-black, so it keys out cleanly) while the colour is left untouched, so
+    compositing it on the dark website reproduces the original glow instead of
+    blowing the faint halo out to full saturation.
+    """
+    try:
+        import numpy as np
+    except ImportError:  # pragma: no cover - dev tooling only
+        return load_source().crop(LOCKUP_CROP)
 
-    # Glass sheen from the top-left so the tile never reads as flat paint.
-    sheen = Image.new("L", (size, size), 0)
-    sd = ImageDraw.Draw(sheen)
-    cx, cy, r = int(size * 0.20), int(size * 0.14), int(size * 0.80)
-    sd.ellipse([cx - r, cy - r, cx + r, cy + r], fill=255)
-    sheen = sheen.filter(ImageFilter.GaussianBlur(size * 0.07))
-    glow = Image.new("RGBA", (size, size), (255, 255, 255, 0))
-    glow.putalpha(sheen.point(lambda p: int(p * 0.16)))
-    tile.alpha_composite(glow)
-    return tile
-
-
-def beat_mark(size: int) -> Image.Image:
-    """The white pulse bars, clipped to the tile's rounded corners."""
-    mark = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    d = ImageDraw.Draw(mark)
-    bar_w = BAR_W * size // SIZE
-    gap = GAP * size // SIZE
-    max_h = MAX_H * size // SIZE
-    total = len(BARS) * bar_w + (len(BARS) - 1) * gap
-    x, cy = (size - total) // 2, size // 2
-    for frac in BARS:
-        h = max(2, int(round(max_h * frac)))
-        d.rounded_rectangle([x, cy - h // 2, x + bar_w, cy - h // 2 + h],
-                            radius=bar_w // 2, fill=WHITE)
-        x += bar_w + gap
-    inside = Image.composite(mark.split()[3], Image.new("L", (size, size), 0), _tile_mask(size))
-    mark.putalpha(inside)
-    return mark
-
-
-def render(size: int) -> Image.Image:
-    img = rounded_tile(size)
-    img.alpha_composite(beat_mark(size))
-    return img
+    src = load_source().crop(LOCKUP_CROP)
+    rgb = np.asarray(src).astype(np.float32)
+    peak = rgb.max(axis=2)
+    alpha = np.clip((peak - 8.0) / 247.0, 0.0, 1.0) * 255.0
+    rgba = np.dstack([rgb, alpha]).astype(np.uint8)
+    return Image.fromarray(rgba, "RGBA")
 
 
 def save(img: Image.Image, path: str, **kw) -> None:
@@ -98,58 +78,62 @@ def save(img: Image.Image, path: str, **kw) -> None:
     print(f"  {path}  ({img.size[0]}x{img.size[1]})")
 
 
-def write_svg() -> None:
-    bar_w, gap, max_h = 58, 28, 236
-    total = len(BARS) * bar_w + (len(BARS) - 1) * gap
-    x0, cy = (BASE - total) // 2, BASE // 2
-    bars = []
-    for frac in BARS:
-        h = int(round(max_h * frac))
-        bars.append(f'    <rect x="{x0}" y="{cy - h // 2}" width="{bar_w}" height="{h}" rx="{bar_w // 2}"/>')
-        x0 += bar_w + gap
-    svg = os.path.join(ROOT, "app/src/main/resources/icon.svg")
-    with open(svg, "w", encoding="utf-8") as f:
-        f.write(
-            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">\n'
-            '  <defs>\n'
-            '    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">\n'
-            '      <stop offset="0" stop-color="#6366F1"/>\n'
-            '      <stop offset="1" stop-color="#A855F7"/>\n'
-            '    </linearGradient>\n'
-            '    <radialGradient id="sheen" cx="0.2" cy="0.14" r="0.8">\n'
-            '      <stop offset="0" stop-color="#ffffff" stop-opacity="0.18"/>\n'
-            '      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>\n'
-            '    </radialGradient>\n'
-            '  </defs>\n'
-            '  <rect width="512" height="512" rx="113" fill="url(#tile)"/>\n'
-            '  <rect width="512" height="512" rx="113" fill="url(#sheen)"/>\n'
-            '  <g fill="#ffffff">\n' + "\n".join(bars) + "\n  </g>\n"
-            '</svg>\n'
-        )
+def write_svg(master: Image.Image) -> None:
+    """Portable vector wrapper around the rendered tile (data-URI PNG)."""
+    buf = io.BytesIO()
+    master.resize((WEB_ICON_SIZE, WEB_ICON_SIZE), Image.LANCZOS).save(
+        buf, format="PNG", optimize=True
+    )
+    encoded = base64.b64encode(buf.getvalue()).decode("ascii")
+    radius = int(WEB_ICON_SIZE * TILE_RADIUS_RATIO)
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" '
+        'width="512" height="512">\n'
+        '  <defs>\n'
+        f'    <clipPath id="tile"><rect width="512" height="512" rx="{radius}"/></clipPath>\n'
+        '  </defs>\n'
+        f'  <image href="data:image/png;base64,{encoded}" width="512" height="512" '
+        'clip-path="url(#tile)"/>\n'
+        '</svg>\n'
+    )
+    path = os.path.join(ROOT, "app/src/main/resources/icon.svg")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(svg)
     print("  app/src/main/resources/icon.svg")
 
 
 if __name__ == "__main__":
     print("BeatPlay logo assets:")
-    master = render(SIZE)
-    big = master.resize((BASE, BASE), Image.LANCZOS)
+    master = rounded_icon(ICON_SIZE)
+    big = master.resize((WEB_ICON_SIZE, WEB_ICON_SIZE), Image.LANCZOS)
     small = master.resize((128, 128), Image.LANCZOS)
+    tiny = master.resize((32, 32), Image.LANCZOS)
 
     # App icon: Compose window + tray, and the Linux package icon.
     save(big, "app/src/main/resources/icon.png", optimize=True)
     save(big, "app/icon.png", optimize=True)
 
     # Windows package icon: every size the shell may ask for.
-    save(big, "app/icon.ico", format="ICO",
-         sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+    save(master, "app/icon.ico", format="ICO",
+         sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64),
+                (128, 128), (256, 256)])
 
     # Website favicon / brand mark.
-    save(small, "web/img/logo-128.png", optimize=True)
-    save(small, "BeatPlay-website/img/logo-128.png", optimize=True)
+    for folder in ("web/img", "BeatPlay-website/img"):
+        save(small, f"{folder}/logo-128.png", optimize=True)
+        save(big, f"{folder}/logo.png", optimize=True)
+        save(tiny, f"{folder}/favicon-32.png", optimize=True)
 
-    # Promo poster logo and the legacy 512 hero.
-    save(small, "promo/assets/logo.png", optimize=True)
-    save(big, "web/img/logo.png", optimize=True)
+    # Full lockup for the hero / brand sections.
+    mark = lockup()
+    scale = 1280 / mark.width
+    mark = mark.resize((1280, round(mark.height * scale)), Image.LANCZOS)
+    for folder in ("web/img", "BeatPlay-website/img"):
+        save(mark, f"{folder}/logo-lockup.png", optimize=True)
 
-    write_svg()
+    # Promo poster logo.
+    save(big, "promo/assets/logo.png", optimize=True)
+
+    write_svg(master)
     print("done")

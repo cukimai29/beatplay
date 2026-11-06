@@ -1,5 +1,11 @@
 # Changelog
 
+## [v1.5.8] - 2026-11-06
+
+* New app icon and website look: the neon "B" emblem replaces the old squircle everywhere — window, tray, Windows .ico, Linux packages, launcher, favicon, promo and the redesigned website.
+* New installs start with the recommended playback settings: Audio quality **High**, Volume normalization **on**, Smart shuffle **on**, and Automix blending for 2s between tracks. Existing installations keep the settings you already chose.
+* Settings → Playback: the Volume normalization note now explains what it actually does instead of saying it is off by default.
+
 ## [v1.5.7] - 2026-11-06
 
 * Fixed the "rejected from ThreadPoolExecutor[Terminated]" error dialog: an audio engine that has already been released no longer throws when it is handed one last task, which is what the outgoing half of a finished blend and a buffered next track both do.

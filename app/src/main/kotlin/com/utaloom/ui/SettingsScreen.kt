@@ -246,7 +246,7 @@ fun SettingsScreen(isMobile: Boolean = System.getProperty("java.vm.name") == "Da
         }
         item { HorizontalDivider(Modifier.padding(horizontal = 24.dp)); SectionTitle("Playback") }
         item { SettingsChoice("Audio quality", "Applies when loading the next track. Downloads use high quality.", s.audioQuality, listOf("AUTO" to "Automatic", "HIGH" to "High", "LOW" to "Low")) { v -> Stores.settings.update { it.copy(audioQuality = v) } } }
-        item { SettingsToggle("Volume normalization", "Gently level tracks that are louder than YouTube's target (at most −1.4 dB). Off by default so the volume you set stays where you set it.", s.normalizeVolume) { v -> Stores.settings.update { it.copy(normalizeVolume = v) } } }
+        item { SettingsToggle("Volume normalization", "Level each track to YouTube's target loudness (at most -1.4 dB), so quieter songs stay audible and louder ones stop jumping out. On by default.", s.normalizeVolume) { v -> Stores.settings.update { it.copy(normalizeVolume = v) } } }
         item {
             TransitionSettings(
                 Automix.transitionOf(s.crossfadeSeconds, s.gaplessPlayback),
