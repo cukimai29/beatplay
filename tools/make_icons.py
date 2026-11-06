@@ -16,8 +16,10 @@ ROOT = Path(__file__).resolve().parents[1]
 RES = ROOT / "app" / "src" / "main" / "res"
 SOURCE = ROOT / "tools" / "logobaru.jpeg"
 
-# Emblem above the wordmark, glow included, cropped to a square.
-EMBLEM_CROP = (258, 0, 1278, 1020)
+# Center the visible emblem, including its glow. The source canvas includes
+# empty space above the mark and the wordmark below it, so a full top crop
+# makes the launcher icon look vertically low.
+EMBLEM_CROP = (285, 150, 1305, 1170)
 TILE_RADIUS_RATIO = 0.225
 MASTER_SIZE = 1024
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## [v1.3.1] - 2026-11-06
+
+### Changed
+- **brand:** Launcher icons repositioned for better vertical centering — the neon B emblem now sits in the middle of the launcher canvas instead of appearing top-heavy
+- **version:** Code bumped to 9 for fresh distribution as a minor visual polish update
+
 ## [v1.3.0] - 2026-11-06
 
 ### Added
