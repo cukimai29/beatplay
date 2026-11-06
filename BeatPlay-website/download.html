@@ -17,7 +17,7 @@
 <div class="progress" aria-hidden="true"></div>
 
 <nav><div class="wrap">
-<a class="brand" href="index.html"><img src="img/logo-128.png" alt="BeatPlay">Beat<span class="word">Play</span></a>
+<a class="brand" href="index.html"><img src="img/logo-128.png" alt="BeatPlay"><span class="brand-name">Beat<span class="word">Play</span></span></a>
 <span class="sp"></span>
 <span class="links"><a href="index.html#fitur">Fitur</a><a href="index.html#tampilan">Tampilan</a><a href="index.html#premium">Premium</a></span>
 <a class="btn small" href="#unduh">Download</a>
@@ -55,16 +55,16 @@
 </main>
 
 <footer><div class="wrap footer-inner">
-<a class="brand" href="index.html"><img src="img/logo-128.png" alt="BeatPlay">Beat<span class="word">Play</span></a>
+<a class="brand" href="index.html"><img src="img/logo-128.png" alt="BeatPlay"><span class="brand-name">Beat<span class="word">Play</span></span></a>
 <p>© 2026 BeatPlay · Proyek independen · Tidak berafiliasi dengan Google atau YouTube.</p>
 <a href="index.html">Kembali ke beranda ↑</a>
 </div></footer>
 
 <script>
 const REPO = "cukimai29/beatplay";
-const ANDROID_APK_URL = "https://github.com/cukimai29/beatplay/releases/download/android-v1.3.0/BeatPlay-1.3.0-android.apk";
-const ANDROID_APK_NAME = "BeatPlay-1.3.0-android.apk";
-const ANDROID_APK_SIZE = "30,04 MB";
+const ANDROID_APK_URL = "https://github.com/cabrata/utaloom-android/releases/download/v1.3.1/BeatPlay-1.3.1-android.apk";
+const ANDROID_APK_NAME = "BeatPlay-1.3.1-android.apk";
+const ANDROID_APK_SIZE = "30,6 MB";
 
 const PLATFORMS = {
   windows: {
@@ -89,7 +89,7 @@ const PLATFORMS = {
     steps: [["Download APK.", "Tombol Download langsung mengunduh file resmi BeatPlay."],
             ["Buka file APK.", "Izinkan instalasi dari browser atau file manager yang kamu gunakan."],
             ["Install, lalu tekan play.", "Memerlukan Android 8.0 atau lebih baru."]],
-    note: "<b>Catatan:</b> APK tidak dari Play Store, jadi Android meminta izin instalasi manual satu kali. Versi 1.3.0 memperbarui instalasi BeatPlay lama tanpa menghapus data. Unduhan langsung dari GitHub Release."
+    note: "<b>Catatan:</b> APK tidak dari Play Store, jadi Android meminta izin instalasi manual satu kali. Versi 1.3.1 memperbarui instalasi BeatPlay lama tanpa menghapus data. Unduhan langsung dari GitHub Release."
   }
 };
 
@@ -126,7 +126,7 @@ async function render() {
   const filesEl = document.getElementById("files");
   if (cfg.manual) {
     document.getElementById("live-label").textContent = "UNDUHAN RESMI";
-    document.getElementById("ver").textContent = "APK Android 1.3.0 · GitHub Release";
+    document.getElementById("ver").textContent = "APK Android 1.3.1 · GitHub Release";
     filesEl.innerHTML = '<div class="file"><div class="meta"><b>' + ANDROID_APK_NAME + '</b><span>' + ANDROID_APK_SIZE + '</span></div><a class="btn" href="' + ANDROID_APK_URL + '">Download</a></div>';
     return;
   }

@@ -20,7 +20,9 @@ SOURCE = os.path.join(ROOT, "web", "img", "logobaru.jpeg")
 
 # The emblem sits above the wordmark. This square crop keeps the full neon glow
 # and stops just before the "BeatPlay" letters.
-EMBLEM_CROP = (258, 0, 1278, 1020)
+# Center the visible mark (including its glow) rather than the square source canvas.
+# The source artwork is vertically low because the wordmark sits underneath it.
+EMBLEM_CROP = (285, 150, 1305, 1170)
 # Emblem + wordmark, with a little breathing room.
 LOCKUP_CROP = (121, 98, 1415, 1259)
 
