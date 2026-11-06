@@ -1,12 +1,14 @@
 # Changelog
 
-## [v1.3.0] - 2026-10-16
+## [v1.3.0] - 2026-11-06
 
 ### Added
+- **brand:** New BeatPlay launcher icon (adaptive + monochrome) and in-app logo
 - **player:** Spotify Canvas backgrounds with automatic login (`3c464b0`)
 - **canvas:** Unit tests for cookie extraction and Canvas URL matching (`e12a965`)
 
 ### Changed
+- **automix:** "Crossfade" is now Automix and ships enabled by default at 2 seconds, with a one-time migration for existing installs
 - **playback:** Reduced streaming lag with next-track prefetching and progressive caching (`9fc42ef`)
 
 ### Fixed
@@ -16,6 +18,10 @@
 - **player:** Fixed blank WebView layouts and added manual cookie entry (`61a158d`)
 - **player:** Fixed blank Spotify login and added a fallback when Canvas is unavailable (`ec7802f`)
 - **lyrics:** Synchronized lyric animations and highlighting during cast playback (`37f542f`)
+
+### BeatPlay
+- Kept premium subscription and video-ad flow from 1.2.1
+- Version code bumped to 8 so the APK updates existing 1.2.1 installs in place
 
 ## [v1.2.0] - 2026-10-12
 

@@ -433,12 +433,12 @@
     <string name="ai_error_unknown">Terjadi kesalahan yang tidak diketahui</string>
     <string name="ai_error_translation_failed">Terjemahan gagal</string>
     <string name="play_all">Putar semua</string>
-    <string name="crossfade">Transisi silang</string>
-    <string name="crossfade_desc">Memudar keluar lagu saat ini seiring lagu berikutnya memudar masuk</string>
-    <string name="crossfade_duration">Durasi crossfade</string>
+    <string name="crossfade">Automix</string>
+    <string name="crossfade_desc">Mencampur akhir lagu saat ini ke lagu berikutnya secara otomatis</string>
+    <string name="crossfade_duration">Durasi Automix</string>
     <string name="crossfade_gapless">Nonaktifkan untuk album tanpa jeda</string>
-    <string name="crossfade_gapless_desc">Lewati crossfade untuk album yang dirancang untuk diputar tanpa jeda</string>
-    <string name="audio_offload_disabled_by_crossfade">Dinonaktifkan karena crossfade aktif</string>
+    <string name="crossfade_gapless_desc">Lewati Automix untuk album yang dirancang untuk diputar tanpa jeda</string>
+    <string name="audio_offload_disabled_by_crossfade">Dinonaktifkan karena Automix aktif</string>
     <string name="hide_youtube_shorts">Sembunyikan YouTube Shorts</string>
     <string name="listen_together_in_top_bar">Listen Together di bilah atas</string>
     <string name="listen_together_in_top_bar_desc">Tampilkan Listen Together di bilah aplikasi atas alih-alih bilah navigasi</string>

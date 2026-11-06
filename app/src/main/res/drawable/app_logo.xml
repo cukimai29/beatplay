@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Utaloom "Woven U" mark. Source: utaloom-web/brand/logo-mark.svg -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="256dp"
-    android:height="256dp"
-    android:viewportWidth="256"
-    android:viewportHeight="256">
-    <group android:translateY="-4">
-        <path
-            android:pathData="M64,64v72c0,38 26,64 64,64s64,-26 64,-64V64"
-            android:strokeColor="#FFF47757"
-            android:strokeWidth="32"
-            android:strokeLineCap="round" />
-        <path
-            android:pathData="M104,64v68c0,15 9,24 24,24s24,-9 24,-24V92"
-            android:strokeColor="#FFFFC6A3"
-            android:strokeWidth="16"
-            android:strokeLineCap="round" />
-    </group>
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="512dp"
+    android:height="512dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <path android:pathData="M113,0 H399 A113,113 0 0 1 512,113 V399 A113,113 0 0 1 399,512 H113 A113,113 0 0 1 0,399 V113 A113,113 0 0 1 113,0 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="0" android:startY="0" android:endX="512" android:endY="512">
+                <item android:offset="0" android:color="#FF6366F1" />
+                <item android:offset="1" android:color="#FFA855F7" />
+            </gradient>
+        </aapt:attr>
+    </path>
+        <path android:fillColor="#FFFFFFFF" android:pathData="M98,230 a29,29 0 0 1 58,0 v52 a29,29 0 0 1 -58,0 z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M184,196 a29,29 0 0 1 58,0 v120 a29,29 0 0 1 -58,0 z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M270,167 a29,29 0 0 1 58,0 v178 a29,29 0 0 1 -58,0 z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M356,210 a29,29 0 0 1 58,0 v92 a29,29 0 0 1 -58,0 z" />
 </vector>

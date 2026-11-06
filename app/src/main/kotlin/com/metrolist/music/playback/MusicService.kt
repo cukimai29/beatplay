@@ -330,8 +330,8 @@ class MusicService :
     private var wasPlayingBeforeVolumeMute = false
     private var isPausedByVolumeMute = false
 
-    private var crossfadeEnabled = false
-    private var crossfadeDuration = 5000f
+    private var crossfadeEnabled = true
+    private var crossfadeDuration = 2000f
     private var crossfadeGapless = true
     private var crossfadeMessage: PlayerMessage? = null
 
@@ -1006,7 +1006,7 @@ class MusicService :
 
         combine(
             dataStore.data.map { it[AudioOffload] ?: false },
-            dataStore.data.map { it[CrossfadeEnabledKey] ?: false },
+            dataStore.data.map { it[CrossfadeEnabledKey] ?: true },
         ) { offloadPref, crossfadeEnabled ->
             // Force disable offload if crossfade is enabled to prevent volume ramp issues
             if (crossfadeEnabled) false else offloadPref
@@ -1213,8 +1213,8 @@ class MusicService :
         combine(
             dataStore.data.map { prefs ->
                 Triple(
-                    prefs[CrossfadeEnabledKey] ?: false,
-                    prefs[CrossfadeDurationKey] ?: 5f,
+                    prefs[CrossfadeEnabledKey] ?: true,
+                    prefs[CrossfadeDurationKey] ?: 2f,
                     prefs[CrossfadeGaplessKey] ?: true,
                 )
             },
@@ -1451,14 +1451,14 @@ class MusicService :
 
         if (prefs != null) {
             val offload = prefs[AudioOffload] ?: false
-            val crossfade = prefs[CrossfadeEnabledKey] ?: false
+            val crossfade = prefs[CrossfadeEnabledKey] ?: true
             player.setOffloadEnabled(if (crossfade) false else offload)
             player.skipSilenceEnabled = prefs[SkipSilenceKey] ?: false
         } else {
             player.apply {
                 runBlocking {
                     val offload = dataStore.get(AudioOffload, false)
-                    val crossfade = dataStore.get(CrossfadeEnabledKey, false)
+                    val crossfade = dataStore.get(CrossfadeEnabledKey, true)
                     setOffloadEnabled(if (crossfade) false else offload)
                     skipSilenceEnabled = dataStore.get(SkipSilenceKey, false)
                 }

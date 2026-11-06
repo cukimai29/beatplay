@@ -380,11 +380,11 @@
     <string name="resume_on_bluetooth_connect">Resume on Bluetooth connection</string>
     <string name="keep_screen_on_when_player_is_expanded">Keep screen on when player is expanded</string>
 
-    <string name="crossfade">Crossfade</string>
-    <string name="crossfade_desc">Fades out the current song as the next one fades in</string>
-    <string name="crossfade_duration">Crossfade duration</string>
+    <string name="crossfade">Automix</string>
+    <string name="crossfade_desc">Blends the end of the current song into the next one automatically</string>
+    <string name="crossfade_duration">Automix duration</string>
     <string name="crossfade_gapless">Disable for gapless albums</string>
-    <string name="crossfade_gapless_desc">Skip crossfade for albums designed to play without gaps</string>
+    <string name="crossfade_gapless_desc">Skip Automix for albums designed to play without gaps</string>
 
     <!-- Romanization Settings -->
     <string name="lyrics_romanize_title">Romanization</string>
@@ -419,7 +419,7 @@
     <!-- Offload -->
     <string name="audio_offload">Enable audio offload</string>
     <string name="audio_offload_description">Uses the hardware audio offload path for playback. Disabling this may increase battery usage, but can help if you experience issues with playback or audio post-processing</string>
-    <string name="audio_offload_disabled_by_crossfade">Disabled because crossfade is active</string>
+    <string name="audio_offload_disabled_by_crossfade">Disabled because Automix is active</string>
 
     <!-- Varispeed -->
     <string name="speed">Playback Speed</string>
