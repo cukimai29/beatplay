@@ -25,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderState
 import androidx.compose.material3.SnackbarHostState
@@ -43,6 +44,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -82,6 +84,7 @@ import com.metrolist.music.constants.MiniPlayerBackgroundStyle
 import com.metrolist.music.constants.MiniPlayerBackgroundStyleKey
 import com.metrolist.music.constants.PlayerBackgroundStyle
 import com.metrolist.music.constants.PlayerBackgroundStyleKey
+import com.metrolist.music.constants.SpotifySpDcCookieKey
 import com.metrolist.music.constants.PlayerButtonsStyle
 import com.metrolist.music.constants.PlayerButtonsStyleKey
 import com.metrolist.music.constants.PureBlackMiniPlayerKey
@@ -341,6 +344,11 @@ fun AppearanceSettings(
         mutableStateOf(false)
     }
 
+    val (spotifySpDc, onSpotifySpDcChange) = rememberPreference(SpotifySpDcCookieKey, defaultValue = "")
+    var showSpotifySpDcDialog by rememberSaveable {
+        mutableStateOf(false)
+    }
+
     var showPlayerButtonsStyleDialog by rememberSaveable {
         mutableStateOf(false)
     }
@@ -553,9 +561,69 @@ fun AppearanceSettings(
                     PlayerBackgroundStyle.DEFAULT -> stringResource(R.string.follow_theme)
                     PlayerBackgroundStyle.GRADIENT -> stringResource(R.string.gradient)
                     PlayerBackgroundStyle.BLUR -> stringResource(R.string.player_background_blur)
+                    PlayerBackgroundStyle.CANVAS -> stringResource(R.string.player_background_canvas)
                 }
             },
         )
+    }
+
+    if (showSpotifySpDcDialog) {
+        var tempSpDc by remember { mutableStateOf(spotifySpDc) }
+
+        DefaultDialog(
+            onDismiss = { showSpotifySpDcDialog = false },
+            buttons = {
+                TextButton(
+                    onClick = {
+                        tempSpDc = ""
+                        onSpotifySpDcChange("")
+                        showSpotifySpDcDialog = false
+                    },
+                ) {
+                    Text(stringResource(R.string.clear))
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                TextButton(
+                    onClick = { showSpotifySpDcDialog = false },
+                ) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+                TextButton(
+                    onClick = {
+                        onSpotifySpDcChange(tempSpDc.trim())
+                        showSpotifySpDcDialog = false
+                    },
+                ) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.spotify_sp_dc_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+                Text(
+                    text = stringResource(R.string.spotify_sp_dc_desc),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 16.dp),
+                )
+                OutlinedTextField(
+                    value = tempSpDc,
+                    onValueChange = { tempSpDc = it },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    label = { Text("sp_dc") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
     }
 
     if (showMiniPlayerBackgroundDialog) {
@@ -1100,7 +1168,7 @@ fun AppearanceSettings(
         Material3SettingsGroup(
             title = stringResource(R.string.player),
             items =
-                listOf(
+                listOfNotNull(
                     Material3SettingsItem(
                         icon = painterResource(R.drawable.palette),
                         title = { Text(stringResource(R.string.new_player_design)) },
@@ -1131,11 +1199,58 @@ fun AppearanceSettings(
                                     PlayerBackgroundStyle.DEFAULT -> stringResource(R.string.follow_theme)
                                     PlayerBackgroundStyle.GRADIENT -> stringResource(R.string.gradient)
                                     PlayerBackgroundStyle.BLUR -> stringResource(R.string.player_background_blur)
+                                    PlayerBackgroundStyle.CANVAS -> stringResource(R.string.player_background_canvas)
                                 },
                             )
                         },
                         onClick = { showPlayerBackgroundDialog = true },
                     ),
+                    if (playerBackground == PlayerBackgroundStyle.CANVAS) {
+                        Material3SettingsItem(
+                            icon = painterResource(if (spotifySpDc.isNotBlank()) R.drawable.check else R.drawable.account),
+                            title = {
+                                Text(
+                                    if (spotifySpDc.isNotBlank()) {
+                                        stringResource(R.string.spotify_logged_in)
+                                    } else {
+                                        stringResource(R.string.spotify_login_title)
+                                    }
+                                )
+                            },
+                            description = {
+                                Text(
+                                    if (spotifySpDc.isNotBlank()) {
+                                        stringResource(R.string.spotify_logout)
+                                    } else {
+                                        stringResource(R.string.spotify_login_desc)
+                                    }
+                                )
+                            },
+                            onClick = {
+                                if (spotifySpDc.isNotBlank()) {
+                                    onSpotifySpDcChange("")
+                                } else {
+                                    navController.navigate("settings/spotify_login")
+                                }
+                            },
+                        )
+                    } else null,
+                    if (playerBackground == PlayerBackgroundStyle.CANVAS) {
+                        Material3SettingsItem(
+                            icon = painterResource(R.drawable.edit),
+                            title = { Text(stringResource(R.string.spotify_sp_dc_title)) },
+                            description = {
+                                Text(
+                                    if (spotifySpDc.isBlank()) {
+                                        stringResource(R.string.spotify_manual_cookie)
+                                    } else {
+                                        "••••••••"
+                                    }
+                                )
+                            },
+                            onClick = { showSpotifySpDcDialog = true },
+                        )
+                    } else null,
                     Material3SettingsItem(
                         icon = painterResource(R.drawable.hide_image),
                         title = { Text(stringResource(R.string.hide_player_thumbnail)) },

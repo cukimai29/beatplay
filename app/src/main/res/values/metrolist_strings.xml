@@ -36,6 +36,7 @@
     <string name="share_lyrics">Share lyrics</string>
     <string name="share_as_text">Share as text</string>
     <string name="share_as_image">Share as image</string>
+    <string name="utaloom_lyrics_signature">woven with Utaloom</string>
     <string name="max_selection_limit">Maximum selection limit reached</string>
     <string name="share_selected">Share selected</string>
     <string name="customize_colors">Customize colors</string>
@@ -98,6 +99,18 @@
     <string name="new_player_design">New player design</string>
     <string name="new_mini_player_design">New mini-player design</string>
     <string name="player_background_blur">Blur</string>
+    <string name="player_background_canvas">Canvas</string>
+    <string name="spotify_sp_dc_title">Spotify sp_dc Cookie</string>
+    <string name="spotify_sp_dc_desc">Used to retrieve Spotify Canvas video backgrounds</string>
+    <string name="spotify_login_title">Log in with Spotify</string>
+    <string name="spotify_login_desc">Log in to Spotify to automatically enable Canvas videos</string>
+    <string name="spotify_logged_in">Connected to Spotify</string>
+    <string name="spotify_logout">Disconnect Spotify</string>
+    <string name="spotify_login_success">Successfully connected to Spotify</string>
+    <string name="spotify_login_loading">Signing in to Spotify...</string>
+    <string name="spotify_manual_cookie">Enter cookie manually</string>
+    <string name="spotify_login_tls_error">Cannot securely connect to Spotify. Check the device date and network, then try again.</string>
+    <string name="spotify_login_save_error">Could not save the Spotify session. Please try again.</string>
     <string name="player_buttons_style">Player button colors</string>
     <string name="default_style">Default</string>
     <string name="primary_color_style">Primary color</string>
@@ -741,6 +754,7 @@
 
     <!-- Theme Palette Names -->
     <string name="palette_dynamic">Dynamic</string>
+    <string name="palette_utaloom_coral">Utaloom Coral</string>
     <string name="palette_crimson">Crimson</string>
     <string name="palette_rose">Rose</string>
     <string name="palette_purple">Purple</string>
