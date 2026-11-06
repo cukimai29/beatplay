@@ -6,7 +6,10 @@ name: Release
 on:
   push:
     branches: [main]
-    paths: [gradle.properties]
+    paths:
+      - gradle.properties
+      # Allows re-running a failed release after fixing this workflow.
+      - .github/workflows/release.yml
   workflow_dispatch:
 
 permissions:
@@ -57,18 +60,56 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
-      # Without libVLC, vlcj recursively scans the runner's directories during audio tests.
+      # Without libVLC, vlcj recursively scans the runner's directories during audio tests,
+      # which on Windows does not fail: it hangs until the step timeout.
       - name: Install VLC (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update -q && sudo apt-get install -y vlc-bin vlc-plugin-base libvlc5
-      - name: Install WiX (Windows)
+      - name: Install VLC and WiX (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: Get-ChildItem 'C:\Program Files (x86)' -Directory -Filter 'WiX Toolset*' | ForEach-Object { "$($_.FullName)\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append }
+        run: |
+          Get-ChildItem 'C:\Program Files (x86)' -Directory -Filter 'WiX Toolset*' | ForEach-Object { "$($_.FullName)\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append }
+          $vlcInstalled = $false
+          for ($i = 1; $i -le 3; $i++) {
+            choco install vlc --yes --no-progress
+            if ($LASTEXITCODE -eq 0) { $vlcInstalled = $true; break }
+            Start-Sleep -Seconds 10
+          }
+          if (-not $vlcInstalled) {
+            $installer = "$env:TEMP\vlc-installer.exe"
+            Invoke-WebRequest -Uri "https://get.videolan.org/vlc/3.0.21/win64/vlc-3.0.21-win64.exe" -OutFile $installer
+            Start-Process -FilePath $installer -ArgumentList "/S" -Wait
+          }
+      - name: Locate VLC (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vlc = "C:\Program Files\VideoLAN\VLC"
+          if (-not (Test-Path "$vlc\libvlc.dll")) { throw "VLC was installed but libvlc.dll is missing from $vlc" }
+          "VLC_PATH=$vlc" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Test
         timeout-minutes: 15
         shell: bash
-        run: bash ./gradlew :shared:jvmTest :app:test --no-daemon
+        run: |
+          set +e
+          bash ./gradlew :shared:jvmTest :app:test --no-daemon
+          code=$?
+          for f in shared/build/test-results/test/*.xml app/build/test-results/test/*.xml; do
+            [ -f "$f" ] || continue
+            awk '/<testcase /{if (match($0, /name="[^"]+"/)) n=substr($0, RSTART+6, RLENGTH-7)} /<(failure|error)[ >]/{print n}' "$f" | sort -u | while read -r t; do
+              echo "::error::Test failed ($(uname -s)): $t in $(basename "$f" .xml)"
+            done
+          done
+          exit $code
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-results-${{ runner.os }}
+          path: |
+            shared/build/test-results/test/*.xml
+            app/build/test-results/test/*.xml
+          if-no-files-found: ignore
       - name: Package
         shell: bash
         run: for t in ${{ matrix.task }}; do bash ./gradlew ":app:$t" --no-daemon; done
