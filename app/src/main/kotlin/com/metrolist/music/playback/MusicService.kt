@@ -789,7 +789,7 @@ class MusicService :
         audioQuality = startupPrefs!![AudioQualityKey]?.let { value ->
             if (value == "VERY_HIGH") com.metrolist.music.constants.AudioQuality.HIGH
             else com.metrolist.music.constants.AudioQuality.entries.find { it.name == value }
-        } ?: com.metrolist.music.constants.AudioQuality.AUTO
+        } ?: com.metrolist.music.constants.AudioQuality.HIGH
         cachedEnableSongCache = startupPrefs!![EnableSongCacheKey] ?: true
         playerVolume = MutableStateFlow((startupPrefs!![PlayerVolumeKey] ?: 1f).coerceIn(0f, 1f))
 
@@ -837,7 +837,7 @@ class MusicService :
                     it[AudioQualityKey]?.let { value ->
                         if (value == "VERY_HIGH") com.metrolist.music.constants.AudioQuality.HIGH
                         else com.metrolist.music.constants.AudioQuality.entries.find { it.name == value }
-                    } ?: com.metrolist.music.constants.AudioQuality.AUTO
+                    } ?: com.metrolist.music.constants.AudioQuality.HIGH
                 }.distinctUntilChanged()
                 .collect { newQuality ->
                     val oldQuality = audioQuality
@@ -1265,7 +1265,7 @@ class MusicService :
             dataStore.data.map { it[AutoLoadMoreKey] ?: true }.distinctUntilChanged().collect { cachedAutoLoadMore = it }
         }
         scope.launch {
-            dataStore.data.map { it[SmartShuffleKey] ?: false }.distinctUntilChanged().collect { enabled ->
+            dataStore.data.map { it[SmartShuffleKey] ?: true }.distinctUntilChanged().collect { enabled ->
                 cachedSmartShuffle = enabled
                 if (playerInitialized.value) {
                     if (enabled) startSmartShuffle() else stopSmartShuffle()

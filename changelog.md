@@ -8,6 +8,8 @@
 - **canvas:** Unit tests for cookie extraction and Canvas URL matching (`e12a965`)
 
 ### Changed
+- **defaults:** Fresh installs now start on Audio quality High, Volume normalization on and Smart shuffle on; existing installs keep what they already picked
+- **brand:** Logo regenerated from the neon "B" emblem: launcher mipmaps, adaptive foreground/monochrome and the in-app logo all come from one source
 - **automix:** "Crossfade" is now Automix and ships enabled by default at 2 seconds, with a one-time migration for existing installs
 - **playback:** Reduced streaming lag with next-track prefetching and progressive caching (`9fc42ef`)
 

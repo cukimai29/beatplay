@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive launcher background: near-black, matching the emblem tile fill so
+     the full-bleed foreground has no visible seam on any launcher mask. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
     <gradient
         android:angle="135"
-        android:endColor="#FFA855F7"
-        android:startColor="#FF6366F1"
+        android:startColor="#0B0716"
+        android:centerColor="#120A22"
+        android:endColor="#1A0B2C"
         android:type="linear" />
 </shape>

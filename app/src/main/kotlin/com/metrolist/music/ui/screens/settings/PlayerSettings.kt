@@ -98,7 +98,7 @@ fun PlayerSettings(
 ) {
     val (audioQuality, onAudioQualityChange) = rememberEnumPreference(
         AudioQualityKey,
-        defaultValue = AudioQuality.AUTO
+        defaultValue = AudioQuality.HIGH
     )
     val (crossfadeEnabled, onCrossfadeEnabledChange) = rememberPreference(
         CrossfadeEnabledKey,
@@ -199,7 +199,7 @@ fun PlayerSettings(
         ShufflePlaylistFirstKey,
         defaultValue = false
     )
-    val (smartShuffle, onSmartShuffleChange) = rememberPreference(SmartShuffleKey, defaultValue = false)
+    val (smartShuffle, onSmartShuffleChange) = rememberPreference(SmartShuffleKey, defaultValue = true)
     val (preventDuplicateTracksInQueue, onPreventDuplicateTracksInQueueChange) = rememberPreference(
         PreventDuplicateTracksInQueueKey,
         defaultValue = false
