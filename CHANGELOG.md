@@ -1,5 +1,9 @@
 # Changelog
 
+## [v1.5.11] - 2026-11-09
+
+* fix(playback): wait for the next track to be ready before Automix (7412dee)
+
 ## [v1.5.10] - 2026-11-09
 
 * fix(playback): reuse libVLC during Automix handover (b59c093)
