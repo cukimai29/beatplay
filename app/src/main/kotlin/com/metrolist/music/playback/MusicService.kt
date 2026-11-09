@@ -2877,6 +2877,7 @@ class MusicService :
 
         lastPlaybackSpeed = -1.0f // force update song
 
+        applyCachedAudioNormalizationNow()
         setupAudioNormalization()
 
         scrobbleManager?.onSongStop()
