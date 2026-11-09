@@ -34,6 +34,9 @@ object Automix {
     /** Load the next track once this much of the current track is still ahead. */
     const val PREPARE_AHEAD_MS = 20_000L
 
+    /** If VLC cannot start the muted/preloaded stream by then, use the normal track switch. */
+    const val PREPARE_READY_TIMEOUT_MS = 12_000L
+
     /** Volume ramp step: smooth enough for a fade, cheap enough to run for seconds. */
     const val STEP_MS = 20L
 

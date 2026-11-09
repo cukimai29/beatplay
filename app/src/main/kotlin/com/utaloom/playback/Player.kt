@@ -9,6 +9,7 @@ import com.utaloom.innertube.YouTube
 import com.utaloom.innertube.models.WatchEndpoint
 import com.metrolist.innertubex.extraction.AudioQuality
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.pow
@@ -987,25 +989,47 @@ object Player {
                 prepareFailed = song.id
                 return@launch
             }
-            val loaded = runCatching { engine.load(mrl, headers, startPaused = true) }.getOrDefault(false)
-            if (!loaded) {
-                prepareFailed = song.id
-                runCatching { engine.release() }
-                return@launch
-            }
-            val track = PreparedTrack(song, engine, generation.get(), trackGain, client)
-            synchronized(Player) {
-                val live = _state.value
-                val stillUpcoming = upcomingIndex(live)?.let { live.queue.getOrNull(it) }
-                if (stillUpcoming?.id != song.id || !live.isPlaying) {
-                    engine.release()
-                    return@synchronized
+            val readiness = CompletableDeferred<Boolean>()
+            val readinessListener = object : AudioEngine.Listener {
+                override fun playing() { readiness.complete(true) }
+                override fun paused() { readiness.complete(true) }
+                override fun buffering(percent: Float) {
+                    if (percent >= 100f) readiness.complete(true)
                 }
-                prepared?.engine?.release()
-                prepared = track
-                prepareFailed = null
+                override fun error() { readiness.complete(false) }
             }
-            updateAudioEffects()
+            engine.addListener(readinessListener)
+            var keepEngine = false
+            try {
+                val loaded = runCatching { engine.load(mrl, headers, startPaused = true) }.getOrDefault(false)
+                if (!loaded) {
+                    prepareFailed = song.id
+                    return@launch
+                }
+                val isReady = withTimeoutOrNull(Automix.PREPARE_READY_TIMEOUT_MS) { readiness.await() } == true
+                if (!isReady) {
+                    prepareFailed = song.id
+                    return@launch
+                }
+                currentCoroutineContext().ensureActive()
+
+                val track = PreparedTrack(song, engine, generation.get(), trackGain, client)
+                synchronized(Player) {
+                    val live = _state.value
+                    val stillUpcoming = upcomingIndex(live)?.let { live.queue.getOrNull(it) }
+                    if (stillUpcoming?.id == song.id && live.isPlaying) {
+                        prepared?.engine?.release()
+                        prepared = track
+                        prepareFailed = null
+                        keepEngine = true
+                    }
+                }
+                if (!keepEngine) return@launch
+                updateAudioEffects()
+            } finally {
+                engine.removeListener(readinessListener)
+                if (!keepEngine) runCatching { engine.release() }
+            }
         }
     }
 

@@ -191,16 +191,10 @@ private class DesktopAudioEngine(
                 else -> null
             }
         } + listOfNotNull(
+            "start-paused".takeIf { startPaused },
             ":http-reconnect".takeIf { url.startsWith("http://", ignoreCase = true) || url.startsWith("https://", ignoreCase = true) },
         )
-        // play(..., "start-paused") only queues playback and returns before buffering. Automix
-        // treats this engine as ready as soon as load() returns, so use vlcj's blocking helper
-        // to wait for VLC to start and pause the media at position zero first.
-        val loaded = if (startPaused) {
-            player.media().startPaused(url, *options.toTypedArray())
-        } else {
-            player.media().play(url, *options.toTypedArray())
-        }
+        val loaded = player.media().play(url, *options.toTypedArray())
         if (loaded) syncAudioFilter(player, pitch, lastEqEnabled)
         return loaded
     }
