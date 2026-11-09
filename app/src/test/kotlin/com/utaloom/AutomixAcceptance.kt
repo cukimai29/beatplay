@@ -46,7 +46,10 @@ fun main() = runBlocking {
                 }
             }
         }
-        Player.setVolume(0)
+        // Keep the native audio path unmuted: this acceptance is intended to exercise real
+        // VLC playback during the overlap, not only queue/state changes.
+        Player.setVolume(35)
+        check(!Player.state.value.muted && Player.state.value.volume > 0) { "Automix acceptance must not run muted" }
         Stores.library.update { it.copy(downloaded = mapOf(a.id to first.absolutePath, b.id to second.absolutePath)) }
         Stores.settings.update { it.copy(gaplessPlayback = true, crossfadeSeconds = crossfadeSeconds) }
 
@@ -90,7 +93,9 @@ fun main() = runBlocking {
         watcher?.cancel()
         Player.stop()
         Player.release()
-        Stores.settings.update { it.copy(gaplessPlayback = defaults.gaplessPlayback, crossfadeSeconds = defaults.crossfadeSeconds) }
+        Stores.settings.update {
+            it.copy(volume = defaults.volume, gaplessPlayback = defaults.gaplessPlayback, crossfadeSeconds = defaults.crossfadeSeconds)
+        }
         Stores.flushAll()
         runCatching { first.delete(); second.delete() }
     }

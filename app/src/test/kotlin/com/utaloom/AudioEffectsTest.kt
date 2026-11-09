@@ -92,6 +92,10 @@ class AudioEffectsTest {
         val zeroOpts = audioEngineOptions(0)
         assertTrue(zeroOpts.contains("--audio-filter=scaletempo"))
         assertFalse(zeroOpts.any { it.startsWith("--pitch-shift=") })
+        assertEquals(
+            System.getProperty("os.name").orEmpty().lowercase().contains("win"),
+            zeroOpts.contains("--aout=directsound"),
+        )
 
         val pitch7Opts = audioEngineOptions(7)
         assertTrue(pitch7Opts.contains("--audio-filter=scaletempo:scaletempo_pitch"))

@@ -79,6 +79,22 @@ class AutomixTest {
     }
 
     @Test
+    fun incomingBufferingPausesFadeProgress() {
+        val clock = Automix.FadeClock(1_000)
+
+        clock.advanceBy(250, buffering = false)
+        assertEquals(0.25f, clock.progress, 0.0001f)
+
+        clock.advanceBy(5_000, buffering = true)
+        assertEquals(0.25f, clock.progress, 0.0001f)
+        assertFalse(clock.isComplete)
+
+        clock.advanceBy(750, buffering = false)
+        assertEquals(1f, clock.progress, 0.0001f)
+        assertTrue(clock.isComplete)
+    }
+
+    @Test
     fun seamlessSwitchIsShortEnoughToFeelInstant() {
         assertTrue(Automix.SEAMLESS_MS <= 200L)
         assertTrue(Automix.STEP_MS <= 50L)

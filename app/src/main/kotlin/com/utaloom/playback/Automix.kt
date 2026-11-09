@@ -40,6 +40,22 @@ object Automix {
     /** Volume ramp step: smooth enough for a fade, cheap enough to run for seconds. */
     const val STEP_MS = 20L
 
+    /**
+     * Tracks active fade time rather than wall-clock time, so an incoming stream that buffers
+     * cannot make the outgoing track fade to silence while there is no replacement audio.
+     */
+    class FadeClock(durationMs: Long) {
+        private val duration = durationMs.coerceAtLeast(1L)
+        private var elapsed = 0L
+
+        val progress: Float get() = (elapsed.toFloat() / duration).coerceIn(0f, 1f)
+        val isComplete: Boolean get() = elapsed >= duration
+
+        fun advanceBy(deltaMs: Long, buffering: Boolean) {
+            if (!buffering) elapsed = (elapsed + deltaMs.coerceAtLeast(0L)).coerceAtMost(duration)
+        }
+    }
+
     fun transitionOf(crossfadeSeconds: Int, gaplessPlayback: Boolean): TrackTransition = when {
         !gaplessPlayback -> TrackTransition.OFF
         crossfadeSeconds <= 0 -> TrackTransition.SEAMLESS

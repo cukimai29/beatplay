@@ -41,6 +41,12 @@ fun audioEngineOptions(pitch: Int = 0): List<String> {
     val filterChain = if (boundedPitch != 0) "scaletempo:scaletempo_pitch" else "scaletempo"
     return buildList {
         add("--no-video")
+        // VLC 3's default MMDevice output can couple the volume of separate media players on
+        // Windows. Automix needs independent per-player levels, so use DirectSound's software
+        // mixing path for the overlapping players instead.
+        if (System.getProperty("os.name").orEmpty().lowercase().contains("win")) {
+            add("--aout=directsound")
+        }
         add("--network-caching=1500")
         add("--audio-filter=$filterChain")
         add("--audio-replay-gain-mode=none")  // Correct VLC option: stop libVLC altering volume per track

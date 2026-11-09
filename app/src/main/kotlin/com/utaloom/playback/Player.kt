@@ -1101,16 +1101,24 @@ object Player {
             incoming.play()
         }
         try {
-            val steps = (windowMs / Automix.STEP_MS).toInt().coerceAtLeast(1)
-            for (step in 1..steps) {
-                val progress = step.toFloat() / steps
+            val clock = Automix.FadeClock(windowMs)
+            var lastTickNanos = System.nanoTime()
+            while (!clock.isComplete) {
+                delay(Automix.STEP_MS)
+                val now = System.nanoTime()
+                val elapsedMs = ((now - lastTickNanos) / 1_000_000L).coerceAtLeast(0L)
+                lastTickNanos = now
+                val previousProgress = clock.progress
+                clock.advanceBy(elapsedMs, buffering = _state.value.isBuffering)
+                val progress = clock.progress
+                if (progress == previousProgress) continue
+
                 blendLevel = Automix.fadeIn(progress)
                 applyVolume()
                 if (fading === outgoing) {
                     val level = (outgoingStart * Automix.fadeOut(progress)).toInt()
                     outgoing.submit { outgoing.setVolume(level) }
                 }
-                delay(Automix.STEP_MS)
             }
         } finally {
             blendLevel = null
