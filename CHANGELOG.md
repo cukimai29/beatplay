@@ -1,5 +1,9 @@
 # Changelog
 
+## [v1.5.14] - 2026-11-09
+
+* fix(playback): use independent Windows audio outputs for Automix (67d0b14)
+
 ## [v1.5.12] - 2026-11-09
 
 * fix(playback): wait for Automix stream readiness without blocking (3be1cea)
