@@ -4,9 +4,12 @@ import com.utaloom.data.Song
 import com.utaloom.data.Stores
 import com.utaloom.platform.NativeLibs
 import com.utaloom.playback.Player
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.flow.collect
 import java.io.File
 import javax.sound.sampled.AudioFileFormat
 import javax.sound.sampled.AudioFormat
@@ -29,8 +32,20 @@ fun main() = runBlocking {
     val a = Song("automixfirst01", "Tone A", listOf("Utaloom"), duration = 6)
     val b = Song("automixsecond1", "Tone B", listOf("Utaloom"), duration = 6)
     val crossfadeSeconds = 3
+    var lastOutgoingPosition = -1L
+    var handoverAt = -1L
+    var watcher: kotlinx.coroutines.Job? = null
     try {
         check(NativeLibs.discoverVlc() == null && Player.init()) { "Native VLC unavailable" }
+        watcher = launch(start = CoroutineStart.UNDISPATCHED) {
+            Player.state.collect { state ->
+                if (state.current?.id == a.id) {
+                    lastOutgoingPosition = state.positionMs
+                } else if (state.current?.id == b.id && handoverAt < 0 && lastOutgoingPosition >= 0) {
+                    handoverAt = lastOutgoingPosition
+                }
+            }
+        }
         Player.setVolume(0)
         Stores.library.update { it.copy(downloaded = mapOf(a.id to first.absolutePath, b.id to second.absolutePath)) }
         Stores.settings.update { it.copy(gaplessPlayback = true, crossfadeSeconds = crossfadeSeconds) }
@@ -41,9 +56,10 @@ fun main() = runBlocking {
         val length = Player.state.value.durationMs
         check(length > 4_000) { "Tone A never reported its length: $length" }
         awaitTrack(b)
-        val handoverAt = Player.state.value.positionMs
         val window = crossfadeSeconds * 1000L
-        check(handoverAt < window + 1_500) { "Automix handed over at ${handoverAt}ms, outside the ${window}ms blend window" }
+        check(handoverAt >= length - window - 500L) {
+            "Automix handed over at ${handoverAt}ms of ${length}ms, before its ${window}ms blend window"
+        }
         check(Player.state.value.isPlaying || Player.state.value.isBuffering) { "The incoming track must keep playing" }
         awaitPlaying()
         check(Player.state.value.durationMs > 4_000) { "The incoming track never reported its own length" }
@@ -71,6 +87,7 @@ fun main() = runBlocking {
         check(Player.state.value.durationMs > 4_000) { "The queue swap during a blend lost the track" }
         println("Queue swapped mid-blend: playback continued: OK")
     } finally {
+        watcher?.cancel()
         Player.stop()
         Player.release()
         Stores.settings.update { it.copy(gaplessPlayback = defaults.gaplessPlayback, crossfadeSeconds = defaults.crossfadeSeconds) }
