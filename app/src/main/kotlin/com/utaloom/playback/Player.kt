@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
-import uk.co.caprica.vlcj.factory.MediaPlayerFactory
 import java.io.File
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.pow
@@ -108,8 +107,6 @@ object Player {
     @Volatile private var blendLevel: Float? = null
     /** Next track that could not be preloaded: one attempt per track is enough. */
     @Volatile private var prepareFailed: String? = null
-    /** libVLC instance shared by the outgoing and incoming engines during a blend. */
-    private var mixFactory: MediaPlayerFactory? = null
     private var prepareJob: Job? = null
     private var transitionJob: Job? = null
     private var audioJob: Job? = null
@@ -141,7 +138,6 @@ object Player {
 
     fun release() {
         val old: AudioEngine?
-        val factory: MediaPlayerFactory?
         synchronized(this) {
             persist()
             finishListening()
@@ -151,12 +147,9 @@ object Player {
             sleepJob?.cancel(); persistJob?.cancel(); audioJob?.cancel()
             old = mp
             mp = null; events = null
-            factory = mixFactory
-            mixFactory = null
         }
         // release may wait for backend event dispatch, so never hold Player's monitor here.
         old?.release()
-        runCatching { factory?.release() }
     }
 
     private fun cancelLoading() {
@@ -846,7 +839,6 @@ object Player {
             Stores.settings.update { it.copy(playbackPitch = backendPitch) }
             return
         }
-        var staleFactory: MediaPlayerFactory? = null
         val swapped = synchronized(Player) {
             val desired = if (remoteControlled || hooks != null) 0 else Stores.settings.value.playbackPitch.coerceIn(-12, 12)
             if (old !== mp || pitch != desired) false else {
@@ -855,15 +847,11 @@ object Player {
                 mp = replacement
                 backendPitch = pitch
                 _state.update { it.copy(pitch = pitch) }
-                // The pitch filter is a factory option, so the blend engine needs a new one too.
-                staleFactory = mixFactory
-                mixFactory = null
                 load(playWhenReady, notify = false, startAt = _state.value.positionMs, countHistory = false)
                 true
             }
         }
         if (swapped) old.release() else replacement.release()
-        runCatching { staleFactory?.release() }
     }
 
     @Synchronized fun restoreAfterBackup() {
@@ -990,12 +978,12 @@ object Player {
                 client = stream.clientName
             }
             currentCoroutineContext().ensureActive()
-            val factory = synchronized(Player) {
+            val pitch = synchronized(Player) {
                 // Never spin up an engine for a Player that is going away.
-                if (mp == null) null
-                else mixFactory ?: MediaPlayerFactory(*audioEngineOptions(backendPitch).toTypedArray()).also { mixFactory = it }
-            } ?: return@launch
-            val engine = runCatching { createAudioEngine(backendPitch, factory) }.getOrElse {
+                if (mp == null) return@launch
+                backendPitch
+            }
+            val engine = runCatching { createAudioEngine(pitch) }.getOrElse {
                 prepareFailed = song.id
                 return@launch
             }

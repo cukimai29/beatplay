@@ -51,20 +51,16 @@ fun audioEngineOptions(pitch: Int = 0): List<String> {
     }
 }
 
-/**
- * Creates an audio engine. Pass [factory] to reuse an existing libVLC instance, which is what
- * Automix does: the outgoing and incoming tracks play at the same time during a blend, and two
- * full libVLC instances would double the memory the app needs.
- */
-fun createAudioEngine(pitch: Int = Stores.settings.value.playbackPitch, factory: MediaPlayerFactory? = null): AudioEngine {
+/** Each player needs its own libVLC instance so overlapping Automix tracks have independent volume controls. */
+fun createAudioEngine(pitch: Int = Stores.settings.value.playbackPitch): AudioEngine {
     val boundedPitch = AudioEffects.sanitizePitch(pitch)
-    val owned = factory ?: MediaPlayerFactory(*audioEngineOptions(boundedPitch).toTypedArray())
+    val owned = MediaPlayerFactory(*audioEngineOptions(boundedPitch).toTypedArray())
     return try {
-        if (factory == null) AudioEffects.populateFromFactory(owned)
+        AudioEffects.populateFromFactory(owned)
         val player = owned.mediaPlayers().newMediaPlayer()
-        DesktopAudioEngine(owned, player, boundedPitch, ownsFactory = factory == null)
+        DesktopAudioEngine(owned, player, boundedPitch)
     } catch (e: Throwable) {
-        if (factory == null) owned.release()
+        owned.release()
         throw e
     }
 }
@@ -73,7 +69,6 @@ private class DesktopAudioEngine(
     private val factory: MediaPlayerFactory,
     private val player: MediaPlayer,
     private val pitch: Int,
-    private val ownsFactory: Boolean = true,
 ) : AudioEngine {
     private val listeners = mutableMapOf<AudioEngine.Listener, MediaPlayerEventAdapter>()
     private var lastEqEnabled = false
@@ -174,7 +169,7 @@ private class DesktopAudioEngine(
             player.release()
         } finally {
             released = true
-            if (ownsFactory) factory.release()
+            factory.release()
         }
     }
 }
