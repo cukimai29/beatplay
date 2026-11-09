@@ -1,5 +1,11 @@
 # Changelog
 
+## [v1.5.10] - 2026-11-09
+
+* fix(playback): reuse libVLC during Automix handover (b59c093)
+* Refresh Android 1.3.2 website package (bc4e4ae)
+* Update Android download link to v1.3.2 (9716b79)
+
 ## [v1.5.9] - 2026-11-09
 
 * fix(playback): isolate VLC volume controls during Automix (94cc447)
