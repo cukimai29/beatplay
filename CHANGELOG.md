@@ -1,5 +1,13 @@
 # Changelog
 
+## [v1.5.9] - 2026-11-09
+
+* fix(playback): isolate VLC volume controls during Automix (94cc447)
+* Update promo poster with centered neon B logo v1.3.1 (1be138d)
+* Update Android download link: APK now hosted in BeatPlay repo (android-v1.3.1 tag) (c549cc2)
+* Refresh website archive after Android download link update (d7ae92f)
+* Update website and logo assets: Android 1.3.1 with centered launcher icons, Windows/Linux v1.5.8 desktop icons (bdaf09b)
+
 ## [v1.5.8] - 2026-11-06
 
 * New app icon and website look: the neon "B" emblem replaces the old squircle everywhere — window, tray, Windows .ico, Linux packages, launcher, favicon, promo and the redesigned website.
