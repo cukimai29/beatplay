@@ -1,5 +1,9 @@
 # Changelog
 
+## [v1.5.12] - 2026-11-09
+
+* fix(playback): wait for Automix stream readiness without blocking (3be1cea)
+
 ## [v1.5.11] - 2026-11-09
 
 * fix(playback): wait for the next track to be ready before Automix (7412dee)
