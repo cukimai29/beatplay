@@ -51,16 +51,54 @@ fun audioEngineOptions(pitch: Int = 0): List<String> {
     }
 }
 
-/** Each player needs its own libVLC instance so overlapping Automix tracks have independent volume controls. */
+/** Reuse one libVLC instance while engines overlap; native volume is still per media player. */
+private object AudioFactoryPool {
+    private data class Entry(val factory: MediaPlayerFactory, var references: Int)
+
+    private val lock = Any()
+    private val entries = mutableMapOf<Int, Entry>()
+
+    fun acquire(pitch: Int): MediaPlayerFactory = synchronized(lock) {
+        entries[pitch]?.let {
+            it.references++
+            return@synchronized it.factory
+        }
+
+        val factory = MediaPlayerFactory(*audioEngineOptions(pitch).toTypedArray())
+        try {
+            AudioEffects.populateFromFactory(factory)
+            entries[pitch] = Entry(factory, 1)
+            factory
+        } catch (error: Throwable) {
+            factory.release()
+            throw error
+        }
+    }
+
+    fun release(pitch: Int, factory: MediaPlayerFactory) {
+        val releaseFactory = synchronized(lock) {
+            val entry = entries[pitch]
+            if (entry == null || entry.factory !== factory) {
+                false
+            } else if (--entry.references == 0) {
+                entries.remove(pitch)
+                true
+            } else {
+                false
+            }
+        }
+        if (releaseFactory) factory.release()
+    }
+}
+
 fun createAudioEngine(pitch: Int = Stores.settings.value.playbackPitch): AudioEngine {
     val boundedPitch = AudioEffects.sanitizePitch(pitch)
-    val owned = MediaPlayerFactory(*audioEngineOptions(boundedPitch).toTypedArray())
+    val factory = AudioFactoryPool.acquire(boundedPitch)
     return try {
-        AudioEffects.populateFromFactory(owned)
-        val player = owned.mediaPlayers().newMediaPlayer()
-        DesktopAudioEngine(owned, player, boundedPitch)
+        val player = factory.mediaPlayers().newMediaPlayer()
+        DesktopAudioEngine(factory, player, boundedPitch)
     } catch (e: Throwable) {
-        owned.release()
+        AudioFactoryPool.release(boundedPitch, factory)
         throw e
     }
 }
@@ -164,12 +202,13 @@ private class DesktopAudioEngine(
     override val time: Long get() = player.status().time()
     override val isSeekable: Boolean get() = player.status().isSeekable
 
-    override fun release() {
+    @Synchronized override fun release() {
+        if (released) return
+        released = true
         try {
             player.release()
         } finally {
-            released = true
-            factory.release()
+            AudioFactoryPool.release(pitch, factory)
         }
     }
 }
