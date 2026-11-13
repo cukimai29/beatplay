@@ -1,15 +1,15 @@
-"""BeatPlay Premium server (QRIS Tripay/Xendit + manual admin).
+"""BeatPlay Premium server (QRIS BuatQris/Tripay/Xendit + manual admin).
 
 Fitur:
 - Premium ditentukan dari Gmail: manual (lifetime oleh admin) atau berbayar (expiry).
-- Pembelian via provider QRIS: Tripay Closed Payment (QRIS2) atau Xendit
-  Payments API v3 (channel QRIS). Mode "mock" untuk tes tanpa kredensial.
+- Pembelian via provider QRIS: BuatQris, Tripay Closed Payment (QRIS2), atau
+  Xendit Payments API v3. Mode "mock" untuk tes tanpa kredensial.
 - Dashboard admin di / : kelola Gmail manual, lihat plans/orders, aktivasi manual.
 
 Run lokal:  python3 premium_server.py [--port 8080] [--admin-token admin123]
 Run VPS:    pastikan HTTPS + domain publik agar callback provider sampai,
-            lalu isi server/tripay_config.json (jangan commit!) dan set
-            --public-base https://domain-anda agar callback URL benar.
+    lalu isi kredensial provider di environment (jangan commit!) dan set
+    --public-base https://domain-anda agar callback URL benar.
 
 Kredensial Tripay: dashboard Tripay > Member > Merchant > Opsi > Edit
 (production) atau API & Integrasi > Simulator > Merchant > Detail (sandbox).
@@ -35,6 +35,7 @@ import os
 import re
 import secrets
 import time
+import threading
 import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -50,6 +51,9 @@ TRIPAY_SANDBOX = "https://tripay.co.id/api-sandbox"
 TRIPAY_PROD = "https://tripay.co.id/api"
 XENDIT_API = "https://api.xendit.co"
 XENDIT_API_VERSION = "2024-11-11"
+BUATQRIS_API = "https://api.buatqris.site"
+BUATQRIS_STATUS_MIN_INTERVAL = 20
+BUATQRIS_STATUS_SCAN_INTERVAL = 5
 
 
 def load_json(path, default):
@@ -80,6 +84,32 @@ def tripay_signature(merchant_code, merchant_ref, amount, private_key):
 def verify_callback_signature(raw_body: bytes, signature: str, private_key: str) -> bool:
     expected = hmac.new(private_key.encode("latin-1"), raw_body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, (signature or "").strip().lower())
+
+
+def verify_buatqris_signature(raw_body: bytes, signature: str, signing_secret: str) -> bool:
+    """Verify BuatQris' X-BuatQris-Signature: sha256=<HMAC-SHA256(raw body)> header."""
+    if not signing_secret or not signature:
+        return False
+    expected = "sha256=" + hmac.new(signing_secret.encode(), raw_body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, str(signature).strip().lower())
+
+
+def buatqris_map_status(status):
+    """Map BuatQris transaction state to the premium order state."""
+    s = str(status or "").strip().lower()
+    if s == "success":
+        return "PAID"
+    if s == "expired":
+        return "EXPIRED"
+    if s == "failed":
+        return "FAILED"
+    return "UNPAID"
+
+
+def _provider_bool(value):
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in ("1", "true", "yes")
 
 
 def xendit_extract_qr(data):
@@ -264,8 +294,8 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:28px}
 </div>
 <div class="card"><h2>Paket</h2><div id="plans"></div></div>
 <div class="card"><h2>Order 20 terakhir</h2><div id="orders"></div></div>
-<div class="card"><h2>QRIS manual</h2><div id="manualbox"></div></div>
-<footer>BeatPlay Premium Server &bull; bayar lunas otomatis untuk provider auto, manual via tombol Aktifkan</footer>
+<div class="card" id="manualQrisCard"><h2>QRIS manual</h2><div id="manualbox"></div></div>
+<footer>BeatPlay Premium Server &bull; pembayaran otomatis diverifikasi lewat callback provider</footer>
 </div>
 <script>
 let PROVIDER = "mock";
@@ -322,10 +352,15 @@ async function refreshAll(){
     return `<tr><td><code>${esc(x.merchant_ref)}</code></td><td>${esc(x.email)}</td><td>${esc(x.plan_id)}</td><td>Rp${x.amount.toLocaleString("id-ID")}</td><td><span class="pill st-${x.status}">${x.status}</span></td><td>${proof}<div style="margin-top:6px">${btn}</div></td></tr>`;
   }).join("");
   document.getElementById("orders").innerHTML = '<table class="tbl"><tr><th>Ref</th><th>Email</th><th>Paket</th><th>Nominal</th><th>Status</th><th>Bukti / Aksi</th></tr>'+rows+"</table>";
-  const m = await api("/api/manual-qris");
-  document.getElementById("manualbox").innerHTML =
-    `<p><b>${esc(m.account_name)||"(belum diisi di plans.json)"}</b><br><span class="mut">${esc(m.instructions)||""}</span></p>`+
-    (m.has_image ? `<a href="/manual-qris.png" target="_blank"><img class="proof" src="/manual-qris.png"></a><p class="mut">Taro file <code>manual_qris.png</code> di folder server untuk mengganti.</p>` : `<p class="mut">Belum ada gambar — taro file <code>manual_qris.png</code> di folder server agar tampil di aplikasi.</p>`);
+  document.getElementById("manualQrisCard").hidden = PROVIDER !== "manual";
+  if (PROVIDER === "manual") {
+    const m = await api("/api/manual-qris");
+    if (m) document.getElementById("manualbox").innerHTML =
+      `<p><b>${esc(m.account_name)||"(belum diisi di plans.json)"}</b><br><span class="mut">${esc(m.instructions)||""}</span></p>`+
+      (m.has_image ? `<a href="/manual-qris.png" target="_blank"><img class="proof" src="/manual-qris.png"></a><p class="mut">Taro file <code>manual_qris.png</code> di folder server untuk mengganti.</p>` : `<p class="mut">Belum ada gambar — taro file <code>manual_qris.png</code> di folder server agar tampil di aplikasi.</p>`);
+  } else {
+    document.getElementById("manualbox").innerHTML = "";
+  }
 }
 async function add(){
   const email=document.getElementById("email").value;
@@ -515,14 +550,109 @@ class XenditClient:
                           {"amount": amount})
 
 
-def resolve_provider(cfg, tripay, xendit):
+class BuatQrisClient:
+    """BuatQris QRIS API and webhook configuration."""
+
+    def __init__(self, cfg):
+        self.cfg = cfg or {}
+
+    @property
+    def mode(self):
+        value = str(self.cfg.get("mode", "sandbox")).strip().lower()
+        if value in ("sandbox", "test"):
+            return "sandbox"
+        if value in ("production", "prod", "real", "live"):
+            return "production"
+        return "invalid"
+
+    @property
+    def valid_mode(self):
+        return self.mode in ("sandbox", "production")
+
+    @property
+    def test_mode(self):
+        # Fail closed: an unrecognized mode must never create a live payment.
+        return self.mode != "production"
+
+    @property
+    def enabled(self):
+        return bool(self.cfg.get("account_id") and self.cfg.get("secret_token") and self.cfg.get("signing_secret"))
+
+    def create(self, merchant_ref, amount, plan_title, callback_url):
+        """Create one QRIS transaction; secrets are sent only to BuatQris over HTTPS."""
+        if not self.valid_mode:
+            raise ValueError("BUATQRIS_MODE harus sandbox atau production")
+        fields = {
+            "action": "api_create_qris",
+            "account_id": self.cfg["account_id"],
+            "secret_token": self.cfg["secret_token"],
+            "amount": str(int(amount)),
+            "description": "BeatPlay Premium {} ({})".format(plan_title, merchant_ref),
+            "qris_method": self.cfg.get("qris_method", "qris_two"),
+            "fee_by": self.cfg.get("fee_by", "user"),
+        }
+        if callback_url:
+            fields["callback_url"] = callback_url
+        if self.test_mode:
+            fields["test"] = "1"
+
+        req = urllib.request.Request(
+            BUATQRIS_API,
+            data=urllib.parse.urlencode(fields).encode(),
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": "Mozilla/5.0 (compatible; BeatPlayPremium/1.0)",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=25) as r:
+                body = r.read().decode()
+                return r.status, json.loads(body or "{}")
+        except urllib.error.HTTPError as e:
+            try:
+                return e.code, json.loads(e.read().decode() or "{}")
+            except (ValueError, UnicodeDecodeError):
+                return e.code, {"message": "HTTP {} dari BuatQris".format(e.code)}
+
+    def check_status(self, transaction_id):
+        """Check one transaction; callers must enforce BuatQris's 20s rate limit."""
+        fields = {
+            "action": "api_check_status",
+            "account_id": self.cfg["account_id"],
+            "secret_token": self.cfg["secret_token"],
+            "transaction_id": str(transaction_id),
+        }
+        req = urllib.request.Request(
+            BUATQRIS_API,
+            data=urllib.parse.urlencode(fields).encode(),
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": "Mozilla/5.0 (compatible; BeatPlayPremium/1.0)",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                body = r.read().decode()
+                return r.status, json.loads(body or "{}")
+        except urllib.error.HTTPError as e:
+            try:
+                return e.code, json.loads(e.read().decode() or "{}")
+            except (ValueError, UnicodeDecodeError):
+                return e.code, {"message": "HTTP {} dari BuatQris".format(e.code)}
+
+
+def resolve_provider(cfg, tripay, xendit, buatqris):
     p = (cfg.get("provider") or "").strip().lower()
-    if p in ("tripay", "xendit", "mock", "manual"):
+    if p in ("buatqris", "tripay", "xendit", "mock", "manual"):
         return p
     if xendit.enabled:
         return "xendit"
     if tripay.enabled:
         return "tripay"
+    if buatqris.enabled:
+        return "buatqris"
     return "manual"
 
 
@@ -533,6 +663,8 @@ class Handler(BaseHTTPRequestHandler):
     pay_cfg = {"provider": "mock", "mode": "mock"}
     tripay = None
     xendit = None
+    buatqris = None
+    payment_lock = threading.RLock()
     provider = "mock"
     admin_token = "admin123"
     public_base = ""
@@ -545,7 +677,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", ctype + "; charset=utf-8")
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Admin-Token, X-Callback-Signature, X-Callback-Event, x-callback-token")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Admin-Token, X-Callback-Signature, X-Callback-Event, x-callback-token, X-BuatQris-Signature")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -565,6 +697,9 @@ class Handler(BaseHTTPRequestHandler):
         return True
 
     def _provider_configured(self):
+        if self.provider == "buatqris":
+            return bool(self.buatqris and self.buatqris.enabled and self.buatqris.valid_mode and
+                        self.public_base.startswith("https://"))
         if self.provider == "xendit":
             return self.xendit.enabled
         if self.provider == "tripay":
@@ -612,11 +747,18 @@ class Handler(BaseHTTPRequestHandler):
         if url.path == "/api/plans":
             out = dict(self.plans)
             out["provider"] = self.provider
-            out["manual"] = self._manual_info()
+            if self.provider == "manual":
+                out["manual"] = self._manual_info()
+            else:
+                out.pop("manual", None)
             return self._send(200, out)
         if url.path == "/api/manual-qris":
+            if self.provider != "manual":
+                return self._send(404, {"error": "QRIS manual tidak aktif"})
             return self._send(200, self._manual_info())
         if url.path == "/manual-qris.png":
+            if self.provider != "manual":
+                return self._send(404, {"error": "QRIS manual tidak aktif"})
             img = os.path.join(HERE, "manual_qris.png")
             if not os.path.exists(img):
                 return self._send(404, {"error": "belum ada gambar QRIS (taro manual_qris.png di folder server)"})
@@ -648,6 +790,8 @@ class Handler(BaseHTTPRequestHandler):
                 "notify_configured": bool(self._notify_cfg().get("telegram_bot_token") and self._notify_cfg().get("telegram_chat_id")),
                 "tripay_mode": self.pay_cfg.get("mode", "mock"),  # kompat lama
                 "tripay_configured": self.tripay.enabled,
+                "buatqris_mode": self.buatqris.mode,
+                "buatqris_configured": self._provider_configured() if self.provider == "buatqris" else self.buatqris.enabled,
             })
         if url.path == "/api/admin/orders":
             if not self._need_admin():
@@ -684,6 +828,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._tripay_callback()
         if url.path == "/api/payments/xendit/callback":
             return self._xendit_callback()
+        if url.path == "/api/payments/buatqris/callback":
+            return self._buatqris_callback()
         if url.path not in ("/api/admin/add", "/api/admin/remove", "/api/admin/revoke",
                             "/api/admin/activate", "/api/admin/orders", "/api/admin/xendit/simulate",
                             "/api/admin/notify/test",
@@ -809,17 +955,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def _mark_paid(self, order, extra=None):
         """Tandai lunas + aktifkan + notif (untuk callback auto/mock)."""
-        if order["status"] != "PAID":
-            order["status"] = "PAID"
-            order["paid_at"] = int(time.time())
-            if extra:
-                order.update(extra)
-            self._activate(order)
-            self._notify(build_paid_message(order, self._plan(order.get("plan_id", ""))),
-                         self._proof_photo_path(order))
+        with self.payment_lock:
+            if order["status"] != "PAID":
+                order["status"] = "PAID"
+                order["paid_at"] = int(time.time())
+                if extra:
+                    order.update(extra)
+                self._activate(order)
+                self._notify(build_paid_message(order, self._plan(order.get("plan_id", ""))),
+                             self._proof_photo_path(order))
 
-    def _refresh_order(self, o):
-        """Sinkron status sekali dari provider bila masih UNPAID."""
+    def _refresh_order(self, o, log_pending=True):
+        """Sinkron status provider; BuatQris checks are persisted and throttled."""
         try:
             if o.get("provider") == "xendit" and self.xendit.enabled and o.get("reference"):
                 code, d = self.xendit.get(o["reference"])
@@ -841,8 +988,83 @@ class Handler(BaseHTTPRequestHandler):
                         else:
                             o["status"] = st
                             self.orders.save()
+            elif o.get("provider") == "buatqris" and self.buatqris and self.buatqris.enabled and o.get("reference"):
+                # Do not ask the currently configured sandbox/live account about
+                # an order created in the other mode (or a legacy order with no
+                # known mode). The webhook remains valid for either mode.
+                if bool(o.get("test_mode", True)) != bool(self.buatqris.test_mode):
+                    return
+
+                now = time.time()
+                with self.payment_lock:
+                    if o.get("status") != "UNPAID":
+                        return
+                    try:
+                        last_check = float(o.get("buatqris_last_status_check_at", 0) or 0)
+                    except (TypeError, ValueError):
+                        last_check = 0
+                    if now - last_check < BUATQRIS_STATUS_MIN_INTERVAL:
+                        return
+                    # Persist before the network call. This also throttles after
+                    # a timeout, process restart, or concurrent status requests.
+                    o["buatqris_last_status_check_at"] = now
+                    self.orders.save()
+
+                code, response = self.buatqris.check_status(str(o["reference"]))
+                data = response.get("data") if isinstance(response, dict) else None
+                if code != 200 or not isinstance(response, dict) or not response.get("success"):
+                    o["provider_check_error"] = "BuatQris status API gagal (HTTP {})".format(code)
+                    print("BuatQris status check failed: HTTP {} or unsuccessful response".format(code), flush=True)
+                    self.orders.save()
+                    return
+                if not isinstance(data, dict) or str(data.get("transaction_id") or "") != str(o["reference"]):
+                    o["provider_check_error"] = "BuatQris status transaction_id tidak cocok"
+                    print("BuatQris status check rejected: transaction_id mismatch", flush=True)
+                    self.orders.save()
+                    return
+
+                st = buatqris_map_status(data.get("status"))
+                if st == "PAID":
+                    try:
+                        paid_amount = int(data.get("amount"))
+                        expected_amount = int(o.get("amount"))
+                        paid_total = int(data.get("total_amount"))
+                        expected_total = int(o.get("gateway_total_amount"))
+                    except (TypeError, ValueError):
+                        o["provider_check_error"] = "BuatQris status amount/total_amount tidak valid"
+                        print("BuatQris status check rejected: invalid amount/total_amount", flush=True)
+                        self.orders.save()
+                        return
+                    if paid_amount != expected_amount or paid_total != expected_total:
+                        o["provider_check_error"] = "BuatQris status amount/total_amount tidak cocok"
+                        print("BuatQris status check rejected: amount/total_amount mismatch", flush=True)
+                        self.orders.save()
+                        return
+                    activated = False
+                    with self.payment_lock:
+                        if o.get("status") == "UNPAID":
+                            self._mark_paid(o, {
+                                "buatqris_transaction_id": data["transaction_id"],
+                                "buatqris_total_amount": data["total_amount"],
+                                "payment_test": bool(o.get("test_mode")),
+                            })
+                            activated = True
+                    print("BuatQris status check accepted: payment.success ({})".format(
+                        "premium activated" if activated else "already paid"), flush=True)
+                elif st in ("EXPIRED", "FAILED"):
+                    with self.payment_lock:
+                        if o.get("status") == "UNPAID":
+                            o["status"] = st
+                            self.orders.save()
+                    print("BuatQris status check accepted: {}".format(st.lower()), flush=True)
+                else:
+                    if o.pop("provider_check_error", None) is not None:
+                        self.orders.save()
+                    if log_pending:
+                        print("BuatQris status check: pending", flush=True)
         except Exception as e:
             o["provider_check_error"] = str(e)[:200]
+            self.orders.save()
 
     def _create_order(self, data):
         email = str(data.get("email", "")).strip().lower()
@@ -886,6 +1108,38 @@ class Handler(BaseHTTPRequestHandler):
             order = dict(base_order, reference=d.get("reference"), status=d.get("status", "UNPAID"),
                          checkout_url=d.get("checkout_url"), qr_string=d.get("qr_string"),
                          qr_url=d.get("qr_url"), pay_code=d.get("pay_code"), expired_at=expired_ts)
+        elif self.provider == "buatqris":
+            if not self.buatqris or not self.buatqris.enabled:
+                return self._send(502, {"error": "BuatQris belum dikonfigurasi (Account ID, Secret Token, dan Signing Secret harus diisi di environment VPS)"})
+            if not self.buatqris.valid_mode:
+                return self._send(502, {"error": "BUATQRIS_MODE tidak valid (gunakan sandbox atau production)"})
+            if not self.public_base.startswith("https://"):
+                return self._send(502, {"error": "PUBLIC_BASE HTTPS belum dikonfigurasi untuk callback BuatQris"})
+            callback_url = self.public_base.rstrip("/") + "/api/payments/buatqris/callback"
+            try:
+                code, r = self.buatqris.create(merchant_ref, amount, str(plan.get("title", plan_id)), callback_url)
+            except Exception as e:
+                return self._send(502, {"error": "BuatQris error: {}".format(str(e)[:200])})
+            if code not in (200, 201) or not isinstance(r, dict) or not r.get("success"):
+                message = r.get("message") or r.get("error") or "respons API tidak sukses" if isinstance(r, dict) else "respons API tidak valid"
+                return self._send(502, {"error": "BuatQris menolak: {}".format(str(message)[:200])})
+            d = r.get("data") or {}
+            if not isinstance(d, dict) or not d.get("transaction_id"):
+                return self._send(502, {"error": "BuatQris tidak mengembalikan transaction_id"})
+            # Never trust a checkout/create response to mark an order paid;
+            # payment must be confirmed by signed webhook or authenticated status API.
+            provider_status = buatqris_map_status(d.get("status"))
+            initial_status = provider_status if provider_status in ("EXPIRED", "FAILED") else "UNPAID"
+            try:
+                expiry_minutes = max(1, int(self.buatqris.cfg.get("expiry_minutes", 15)))
+            except (TypeError, ValueError):
+                expiry_minutes = 15
+            order = dict(base_order, reference=str(d["transaction_id"]), status=initial_status,
+                         checkout_url=d.get("payment_url"), qr_string=d.get("qr_string"),
+                         qr_url=d.get("qr_url"), pay_code=None,
+                         expired_at=int(time.time()) + expiry_minutes * 60,
+                         gateway_total_amount=d.get("total_amount"),
+                         test_mode=self.buatqris.test_mode)
         else:
             if self.provider == "mock":
                 order = dict(base_order, reference="MOCK-" + merchant_ref,
@@ -897,8 +1151,9 @@ class Handler(BaseHTTPRequestHandler):
                              checkout_url=None, qr_string=None,
                              qr_url=None, pay_code=None, manual=True,
                              expired_at=int(time.time()) + 24 * 3600)
-        self.orders.orders[merchant_ref] = order
-        self.orders.save()
+        with self.payment_lock:
+            self.orders.orders[merchant_ref] = order
+            self.orders.save()
         return self._send(200, {"order": order})
 
     def _tripay_callback(self):
@@ -949,11 +1204,110 @@ class Handler(BaseHTTPRequestHandler):
                     self._mark_paid(o, {"xendit_payment_id": d.get("payment_id")})
         return self._send(200, {"success": True})
 
+    def _buatqris_callback(self):
+        n = int(self.headers.get("Content-Length", "0") or 0)
+        raw = self.rfile.read(n) if n > 0 else b"{}"
+        if not self.buatqris or not self.buatqris.enabled:
+            print("BuatQris callback rejected: provider not configured", flush=True)
+            return self._send(503, {"success": False, "message": "BuatQris webhook belum dikonfigurasi"})
+        if not verify_buatqris_signature(raw, self.headers.get("X-BuatQris-Signature", ""),
+                                         self.buatqris.cfg.get("signing_secret", "")):
+            print("BuatQris callback rejected: invalid signature", flush=True)
+            return self._send(401, {"success": False, "message": "signature BuatQris tidak valid"})
+        try:
+            data = json.loads(raw.decode())
+        except (ValueError, UnicodeDecodeError):
+            print("BuatQris callback rejected: invalid JSON", flush=True)
+            return self._send(400, {"success": False, "message": "body bukan JSON"})
+        if not isinstance(data, dict):
+            print("BuatQris callback rejected: payload is not an object", flush=True)
+            return self._send(400, {"success": False, "message": "payload harus JSON object"})
+
+        event = str(data.get("event") or "")
+        transaction_id = str(data.get("transaction_id") or "")
+        if not transaction_id:
+            print("BuatQris callback ignored: missing transaction_id", flush=True)
+            return self._send(200, {"success": True})
+        order = next((o for o in self.orders.orders.values()
+                      if o.get("provider") == "buatqris" and str(o.get("reference") or "") == transaction_id), None)
+        if order is None:
+            print("BuatQris callback ignored: transaction does not match an order", flush=True)
+            return self._send(200, {"success": True})  # unknown/old transaction: ack, do not retry
+
+        if "is_test" in data and _provider_bool(data.get("is_test")) != bool(order.get("test_mode")):
+            print("BuatQris callback ignored: test/live mode mismatch", flush=True)
+            return self._send(200, {"success": True, "ignored": True})
+
+        status = str(data.get("status") or "").strip().lower()
+        if event == "payment.expired" and status == "expired":
+            with self.payment_lock:
+                if order.get("status") != "PAID":
+                    order["status"] = "EXPIRED"
+                    self.orders.save()
+            print("BuatQris callback accepted: payment.expired", flush=True)
+            return self._send(200, {"success": True})
+        if event == "payment.failed" and status == "failed":
+            with self.payment_lock:
+                if order.get("status") != "PAID":
+                    order["status"] = "FAILED"
+                    self.orders.save()
+            print("BuatQris callback accepted: payment.failed", flush=True)
+            return self._send(200, {"success": True})
+        if event != "payment.success" or status != "success":
+            print("BuatQris callback ignored: unexpected event/status", flush=True)
+            return self._send(200, {"success": True})
+
+        try:
+            paid_amount = int(data.get("amount"))
+            expected_amount = int(order.get("amount"))
+            paid_total = int(data.get("total_amount"))
+            expected_total = int(order.get("gateway_total_amount", expected_amount))
+        except (TypeError, ValueError):
+            print("BuatQris callback rejected: invalid amount/total_amount", flush=True)
+            return self._send(400, {"success": False, "message": "amount/total_amount callback tidak valid"})
+        if paid_amount != expected_amount or paid_total != expected_total:
+            print("BuatQris callback rejected: amount/total_amount mismatch", flush=True)
+            return self._send(400, {"success": False, "message": "nominal callback tidak cocok dengan order"})
+
+        already_paid = order.get("status") == "PAID"
+        if order.get("status") != "PAID":
+            self._mark_paid(order, {
+                "buatqris_transaction_id": transaction_id,
+                "buatqris_total_amount": data.get("total_amount"),
+                "payment_test": _provider_bool(data.get("is_test")),
+            })
+        print("BuatQris callback accepted: payment.success ({})".format(
+            "already paid" if already_paid else "premium activated"), flush=True)
+        return self._send(200, {"success": True})
+
+
+def refresh_pending_buatqris_orders(checker):
+    """Run one safe sweep; each individual status check has a persisted 20s limit."""
+    if not checker.buatqris or not checker.buatqris.enabled:
+        return
+    with checker.payment_lock:
+        pending = [o for o in checker.orders.orders.values()
+                   if o.get("provider") == "buatqris" and o.get("status") == "UNPAID"]
+    for order in pending:
+        checker._refresh_order(order, log_pending=False)
+
+
+def buatqris_status_worker():
+    """Background fallback so payment activation does not depend on an app refresh."""
+    checker = object.__new__(Handler)
+    while True:
+        try:
+            if Handler.provider == "buatqris":
+                refresh_pending_buatqris_orders(checker)
+        except Exception as e:
+            print("BuatQris background status checker error: {}".format(str(e)[:200]), flush=True)
+        time.sleep(BUATQRIS_STATUS_SCAN_INTERVAL)
+
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8080)
-    ap.add_argument("--admin-token", default="admin123")
+    ap.add_argument("--admin-token", default=None)
     ap.add_argument("--store", default=os.path.join(HERE, "premium_emails.json"))
     ap.add_argument("--expiry-store", default=os.path.join(HERE, "premium_expiry.json"))
     ap.add_argument("--orders-store", default=os.path.join(HERE, "orders.json"))
@@ -965,16 +1319,35 @@ def main():
     Handler.orders = OrderStore(args.orders_store)
     Handler.plans = load_json(args.plans, {"plans": [], "tripay_method": "QRIS2"})
     Handler.pay_cfg = load_json(args.tripay_config, {"mode": "mock"})
+    provider_env = os.getenv("PAYMENT_PROVIDER", "").strip().lower()
+    if provider_env:
+        Handler.pay_cfg["provider"] = provider_env
     Handler.tripay = TripayClient(Handler.pay_cfg)
     Handler.xendit = XenditClient(Handler.pay_cfg.get("xendit", {}))
-    Handler.provider = resolve_provider(Handler.pay_cfg, Handler.tripay, Handler.xendit)
-    Handler.admin_token = args.admin_token
-    Handler.public_base = args.public_base
+    buatqris_cfg = dict(Handler.pay_cfg.get("buatqris", {}) or {})
+    for env_name, key in (
+        ("BUATQRIS_ACCOUNT_ID", "account_id"),
+        ("BUATQRIS_SECRET_TOKEN", "secret_token"),
+        ("BUATQRIS_SIGNING_SECRET", "signing_secret"),
+        ("BUATQRIS_QRIS_METHOD", "qris_method"),
+        ("BUATQRIS_FEE_BY", "fee_by"),
+        ("BUATQRIS_MODE", "mode"),
+        ("BUATQRIS_EXPIRY_MINUTES", "expiry_minutes"),
+    ):
+        value = os.getenv(env_name, "").strip()
+        if value:
+            buatqris_cfg[key] = value
+    Handler.buatqris = BuatQrisClient(buatqris_cfg)
+    Handler.provider = resolve_provider(Handler.pay_cfg, Handler.tripay, Handler.xendit, Handler.buatqris)
+    Handler.admin_token = args.admin_token or os.getenv("ADMIN_TOKEN") or "admin123"
+    Handler.public_base = args.public_base or os.getenv("PUBLIC_BASE", "")
     # Selalu dengar di semua interface agar bisa diakses dari luar (NSG/ufw yang membatasi).
     srv = ThreadingHTTPServer(("0.0.0.0", args.port), Handler)
+    if Handler.provider == "buatqris" and Handler.buatqris.enabled:
+        threading.Thread(target=buatqris_status_worker, name="buatqris-status-checker", daemon=True).start()
+        print("BuatQris background status checker enabled (max 1 check/order/20s)", flush=True)
     print("Premium server: http://127.0.0.1:{}/ (provider: {}, configured: {})".format(
-        args.port, Handler.provider,
-        Handler.xendit.enabled if Handler.provider == "xendit" else Handler.tripay.enabled if Handler.provider == "tripay" else False))
+        args.port, Handler.provider, Handler._provider_configured(Handler)))
     srv.serve_forever()
 
 

@@ -138,7 +138,7 @@ data class Settings(
     val isPremium: Boolean = false,
     val premiumLastChecked: Long = 0L,
     val premiumExpiry: Long? = null, // epoch detik dari server; null = lifetime/manual
-    val premiumServerUrl: String = "http://52.141.21.195:8080",
+    val premiumServerUrl: String = "https://premium.adminbeat.my.id",
     val premiumDevMode: Boolean = false, // tampilkan opsi developer di layar Premium
     val songsSinceAd: Int = 0,
     val adEveryNSongs: Int = 3,
@@ -146,7 +146,7 @@ data class Settings(
     // Path file video iklan lokal. Kosong = pakai video bawaan (ad.mp4).
     val adVideoPath: String = "",
     // Current defaults schema. Fresh installs start here and skip legacy migrations.
-    val settingsSchema: Int = 3,
+    val settingsSchema: Int = 4,
 ) {
     /** Apply the current fresh-install playback defaults in one place. */
     internal fun applyCurrentDefaults(): Settings = copy(
@@ -155,7 +155,7 @@ data class Settings(
         smartShuffle = true,
         gaplessPlayback = true,
         crossfadeSeconds = DEFAULT_CROSSFADE_SECONDS,
-        settingsSchema = 3,
+        settingsSchema = 4,
     )
 
     internal fun normalizeLegacyLtServerUrl() =
@@ -177,6 +177,14 @@ data class Settings(
             // gap between tracks until the user finds the setting themselves.
             s = if (s.gaplessPlayback) s.copy(settingsSchema = 2)
             else s.copy(gaplessPlayback = true, crossfadeSeconds = DEFAULT_CROSSFADE_SECONDS, settingsSchema = 2)
+        }
+        if (s.settingsSchema < 4) {
+            val premiumServerUrl = if (s.premiumServerUrl.trim().trimEnd('/') == "http://52.141.21.195:8080") {
+                "https://premium.adminbeat.my.id"
+            } else {
+                s.premiumServerUrl
+            }
+            s = s.copy(premiumServerUrl = premiumServerUrl, settingsSchema = 4)
         }
         return s
     }
