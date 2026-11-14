@@ -212,13 +212,10 @@ import com.metrolist.music.playback.queues.YouTubeQueue
 import com.metrolist.music.playback.queues.YouTubePlaylistQueue
 import com.metrolist.music.playback.queues.filterExplicit
 import com.metrolist.music.playback.queues.filterVideoSongs
-import com.metrolist.music.premium.AdDecision
 import com.metrolist.music.premium.AdGate
 import com.metrolist.music.premium.AdState
 import com.metrolist.music.premium.PremiumSnapshot
-import com.metrolist.music.premium.recordSongPlayedForAds
-import com.metrolist.music.premium.resetAdCounter
-import com.metrolist.music.premium.setSongsSinceAd
+import com.metrolist.music.premium.randomAdIntervalMs
 import com.metrolist.music.constants.AdEveryNSongsKey
 import com.metrolist.music.constants.AdSecondsKey
 import com.metrolist.music.constants.DEFAULT_AD_EVERY_N_SONGS
@@ -524,6 +521,11 @@ class MusicService :
     private var cachedAutoplay = true
     @Volatile
     private var cachedPremium = PremiumSnapshot()
+
+    /** Time-based ad schedule: one random break every 7-12 minutes of playback. */
+    private var adElapsedMs = 0L
+    private var adNextAtMs = randomAdIntervalMs(kotlin.random.Random.Default)
+    private var adSavedRepeatMode: Int? = null
     @Volatile
     private var cachedDisableLoadMoreWhenRepeatAll = false
     @Volatile
@@ -1247,7 +1249,24 @@ class MusicService :
                     adSeconds = prefs[AdSecondsKey] ?: DEFAULT_AD_SECONDS,
                     devMode = prefs[PremiumDevModeKey] == true,
                 )
-            }.distinctUntilChanged().collect { cachedPremium = it }
+            }.distinctUntilChanged().collect { snapshot ->
+                cachedPremium = snapshot
+                if (snapshot.isPremium) {
+                    // Upgraded while an ad was queued: drop it and stop the clock.
+                    removeAdItems()
+                    AdState.finishNow()
+                    adElapsedMs = 0
+                    AdState.setNextAdIn(0)
+                }
+            }
+        }
+        // Ad breaks follow listening time, so a queue of short tracks cannot shift
+        // them and skipping tracks does not count as extra listening.
+        scope.launch {
+            while (true) {
+                delay(AD_TICK_MS)
+                tickAdTimer()
+            }
         }
         scope.launch {
             dataStore.data.map { it[DisableLoadMoreWhenRepeatAllKey] ?: false }.distinctUntilChanged().collect { cachedDisableLoadMoreWhenRepeatAll = it }
@@ -2788,36 +2807,17 @@ class MusicService :
     ) {
         prefetchNextStream()
 
-        // Natural advance into a new item: the previous song just finished.
-        // (ExoPlayer fires no ENDED between items, and crossfade swaps reuse
-        // this path too.) When the ad is due, insert it in front of the song
-        // that just auto-started and seek onto it.
-        val leftAd = AdGate.isAdMediaId(lastTransitionedMediaId)
-        if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO &&
-            !AdGate.isAdMediaId(mediaItem?.mediaId) && mediaItem != null &&
-            lastTransitionedMediaId != null && !leftAd && !AdState.isShowing() &&
-            castConnectionHandler?.isCasting?.value != true
-        ) {
-            val (action, newCount) = AdGate.decideAfterSong(
-                cachedPremium.isPremium, cachedPremium.songsSinceAd,
-                cachedPremium.adEveryNSongs, casting = false,
-            )
-            scope.launch(SilentHandler) { runCatching { setSongsSinceAd(newCount) } }
-            if (action == AdDecision.INSERT_AD) {
-                // The next song has already started (AUTO transition). Put the ad in
-                // front of it and seek onto the ad so the user hears exactly three
-                // songs, not four, before the break.
-                val adIndex = player.currentMediaItemIndex.coerceAtLeast(0)
-                player.addMediaItem(adIndex, buildAdMediaItem())
-                player.seekTo(adIndex, 0)
-            }
-        }
-        // Leaving an ad: drop it and reset the counter. This also covers a skip
-        // from notification/hardware controls; the overlay itself keeps counting
-        // down, so the break cannot actually be skipped.
+        // Ad breaks are scheduled by listening time (see tickAdTimer) and enqueued
+        // right after the current song, so no counting happens here.
+        // Leaving an ad: drop it, restore the user's repeat mode and reset the timer.
+        // This also covers a skip from notification/hardware controls; the overlay
+        // itself keeps counting down, so the break cannot actually be skipped.
         if (AdGate.isAdMediaId(lastTransitionedMediaId) && !AdGate.isAdMediaId(mediaItem?.mediaId)) {
             removeAdItems()
-            scope.launch(SilentHandler) { runCatching { resetAdCounter() } }
+            adSavedRepeatMode?.let { player.repeatMode = it }
+            adSavedRepeatMode = null
+            adElapsedMs = 0
+            AdState.setNextAdIn(adNextAtMs)
         }
         // Entering the ad: show the blocking overlay (capped by adSeconds,
         // ended early by finishNow when the ad item completes or is left).
@@ -2826,7 +2826,8 @@ class MusicService :
         if (AdGate.isAdMediaId(mediaItem?.mediaId) && !AdState.isShowing()) {
             scope.launch(SilentHandler) {
                 AdState.showAdBlocking(cachedPremium.adSeconds, PREMIUM_AD_TEXT) {
-                    scope.launch(SilentHandler) { runCatching { resetAdCounter() } }
+                    adElapsedMs = 0
+                    AdState.setNextAdIn(adNextAtMs)
                 }
             }
         }
@@ -2949,17 +2950,7 @@ class MusicService :
             val repeatMode = player.repeatMode
 
             if (player.playWhenReady && repeatMode == REPEAT_MODE_ALL && player.mediaItemCount > 0) {
-                // Loop wrap counts as a finished song; insert the ad at the head when due.
-                if (!AdState.isShowing() && castConnectionHandler?.isCasting?.value != true) {
-                    val (action, newCount) = AdGate.decideAfterSong(
-                        cachedPremium.isPremium, cachedPremium.songsSinceAd,
-                        cachedPremium.adEveryNSongs, casting = false,
-                    )
-                    scope.launch(SilentHandler) { runCatching { setSongsSinceAd(newCount) } }
-                    if (action == AdDecision.INSERT_AD) {
-                        player.addMediaItem(0, buildAdMediaItem())
-                    }
-                }
+                // Ad breaks are time-based; just wrap the queue.
                 player.seekTo(0, 0)
                 player.prepare()
                 player.play()
@@ -2982,22 +2973,7 @@ class MusicService :
                     return
                 }
                 if (!player.hasNextMediaItem()) {
-                    // Queue finished: append a closing ad when one is due.
-                    if (!AdState.isShowing() && castConnectionHandler?.isCasting?.value != true) {
-                        val (action, newCount) = AdGate.decideAfterSong(
-                            cachedPremium.isPremium, cachedPremium.songsSinceAd,
-                            cachedPremium.adEveryNSongs, casting = false,
-                        )
-                        scope.launch(SilentHandler) { runCatching { setSongsSinceAd(newCount) } }
-                        if (action == AdDecision.INSERT_AD) {
-                            player.addMediaItem(buildAdMediaItem())
-                            player.seekTo(player.mediaItemCount - 1, 0)
-                            player.prepare()
-                            if (castConnectionHandler?.isCasting?.value != true) {
-                                player.play()
-                            }
-                        }
-                    }
+                    // Queue finished; the next break is scheduled by listening time.
                     return
                 }
                 // Mid-queue advances are owned by onMediaItemTransition (ExoPlayer
@@ -3047,6 +3023,51 @@ class MusicService :
                 player.removeMediaItem(i)
             }
         }
+    }
+
+    private fun hasAdItem(): Boolean =
+        (0 until player.mediaItemCount).any { player.getMediaItemAt(it).mediaId == AdGate.AD_MEDIA_ID }
+
+    /**
+     * Adds one 5-second tick of listening time and starts a break once the random
+     * 7-12 minute interval has elapsed. The ad is queued right after the current
+     * song, so the music is never cut in the middle; the overlay blocks skipping.
+     */
+    private fun tickAdTimer() {
+        val playing = player.isPlaying && player.playbackState == Player.STATE_READY
+        val eligible = !cachedPremium.isPremium &&
+            !AdState.isShowing() &&
+            castConnectionHandler?.isCasting?.value != true &&
+            playing &&
+            !hasAdItem()
+        if (!eligible) return
+
+        adElapsedMs += AD_TICK_MS
+        val due = AdGate.shouldStartBreak(
+            isPremium = cachedPremium.isPremium,
+            elapsedMs = adElapsedMs,
+            nextAtMs = adNextAtMs,
+            adShowing = AdState.isShowing(),
+            casting = false,
+            playing = playing,
+        )
+        if (!due) {
+            AdState.setNextAdIn(adNextAtMs - adElapsedMs)
+            return
+        }
+
+        val index = player.currentMediaItemIndex
+        if (index < 0 || player.mediaItemCount == 0) return
+        if (player.repeatMode == Player.REPEAT_MODE_ONE) {
+            // Repeat-one would never advance past the queued ad, so allow a single
+            // pass through the queue and restore the user's mode after the break.
+            adSavedRepeatMode = player.repeatMode
+            player.repeatMode = Player.REPEAT_MODE_ALL
+        }
+        player.addMediaItem(index + 1, buildAdMediaItem())
+        adElapsedMs = 0
+        adNextAtMs = randomAdIntervalMs(kotlin.random.Random.Default)
+        AdState.setNextAdIn(adNextAtMs)
     }
 
     override fun onPlayWhenReadyChanged(
@@ -5549,6 +5570,7 @@ class MusicService :
         const val CHANNEL_ID = "music_channel_01"
         const val NOTIFICATION_ID = 888
         const val PREMIUM_AD_TEXT = "BeatPlay Premium - dengarkan tanpa jeda iklan."
+const val AD_TICK_MS = 5_000L
         const val ERROR_CODE_NO_STREAM = 1000001
         const val CHUNK_LENGTH = 512 * 1024L
         const val PERSISTENT_QUEUE_FILE = "persistent_queue.data"

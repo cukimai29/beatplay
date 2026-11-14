@@ -17,6 +17,13 @@ object AdState {
     val secondsLeft: StateFlow<Int> = _secondsLeft.asStateFlow()
     private val _text = MutableStateFlow("BeatPlay Premium - dengarkan tanpa jeda iklan.")
     val text: StateFlow<String> = _text.asStateFlow()
+    private val _nextAdInMs = MutableStateFlow(0L)
+    val nextAdInMs: StateFlow<Long> = _nextAdInMs.asStateFlow()
+
+    /** Time left until the next scheduled break (0 when unknown or Premium). */
+    fun setNextAdIn(ms: Long) {
+        _nextAdInMs.value = ms.coerceAtLeast(0)
+    }
 
     fun isShowing(): Boolean = _showing.value
 

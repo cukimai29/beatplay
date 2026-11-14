@@ -50,30 +50,55 @@ class PremiumGateTest {
 
     @Test
     fun premiumNeverGetsAds() {
-        assertFalse(AdGate.shouldShowAd(true, 99, 3))
-        assertFalse(AdGate.shouldShowAd(false, 2, 3))
-        assertTrue(AdGate.shouldShowAd(false, 3, 3))
-        assertEquals(3, AdGate.nextCounter(2))
+        // Premium never starts a break, no matter how long the session runs.
+        assertFalse(
+            AdGate.shouldStartBreak(
+                isPremium = true, elapsedMs = 60 * 60_000L, nextAtMs = 7 * 60_000L,
+                adShowing = false, casting = false, playing = true,
+            ),
+        )
     }
 
     @Test
-    fun decideAfterSongCountsAndInserts() {
-        // 2 already finished, this 3rd finishes -> counter hits 3 -> insert ad.
-        assertEquals(AdDecision.INSERT_AD to 3, AdGate.decideAfterSong(false, 2, 3, casting = false))
-        // Only 1 finished before -> count to 2, no ad yet.
-        assertEquals(AdDecision.COUNT_ONLY to 2, AdGate.decideAfterSong(false, 1, 3, casting = false))
-        // Premium never inserts; casting never inserts.
-        assertEquals(AdDecision.COUNT_ONLY to 99, AdGate.decideAfterSong(true, 98, 3, casting = false))
-        assertEquals(AdDecision.COUNT_ONLY to 4, AdGate.decideAfterSong(false, 3, 3, casting = true))
+    fun breakStartsOnlyWhenDueAndEligible() {
+        val next = 9 * 60_000L
+        assertFalse(
+            AdGate.shouldStartBreak(false, next - 1, next, adShowing = false, casting = false, playing = true),
+        )
+        assertTrue(
+            AdGate.shouldStartBreak(false, next, next, adShowing = false, casting = false, playing = true),
+        )
+        // Never stack breaks or interrupt casting/paused playback.
+        assertFalse(
+            AdGate.shouldStartBreak(false, next * 2, next, adShowing = true, casting = false, playing = true),
+        )
+        assertFalse(
+            AdGate.shouldStartBreak(false, next * 2, next, adShowing = false, casting = true, playing = true),
+        )
+        assertFalse(
+            AdGate.shouldStartBreak(false, next * 2, next, adShowing = false, casting = false, playing = false),
+        )
     }
 
     @Test
-    fun adMediaIdDetection() {        assertTrue(AdGate.isAdMediaId("beatplay-ad"))
+    fun adIntervalIsRandomBetweenSevenAndTwelveMinutes() {
+        val random = kotlin.random.Random(42)
+        repeat(200) {
+            val ms = randomAdIntervalMs(random)
+            assertTrue(ms >= 7 * 60_000L)
+            assertTrue(ms <= 12 * 60_000L)
+            assertEquals(0L, ms % 60_000L)
+        }
+        // The window must actually vary, not always return one fixed value.
+        val values = (1..50).map { randomAdIntervalMs(random) }.toSet()
+        assertTrue(values.size > 1)
+    }
+
+    @Test
+    fun adMediaIdDetection() {
+        assertTrue(AdGate.isAdMediaId("beatplay-ad"))
         assertFalse(AdGate.isAdMediaId("some-song-id"))
         assertFalse(AdGate.isAdMediaId(null))
-        // Counter stays untouched while an ad is on screen (reset happens after).
-        assertTrue(AdGate.shouldShowAd(false, 3, 3))
-        assertEquals(4, AdGate.nextCounter(3))
     }
 
     @Test

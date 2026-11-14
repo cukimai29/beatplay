@@ -1064,8 +1064,8 @@
     <string name="premium_status_free">Paket gratis</string>
     <string name="premium_active_desc">Tanpa iklan audio.</string>
     <string name="premium_valid_until">Berlaku s/d %1$s.</string>
-    <string name="premium_free_desc">Iklan video 10 detik tiap %1$d lagu. Upgrade untuk mendengar tanpa jeda.</string>
-    <string name="premium_next_ad">Iklan berikutnya setelah %1$d lagu lagi.</string>
+    <string name="premium_free_desc">Akun gratis diputar dengan jeda iklan singkat secara acak tiap 7–12 menit. Upgrade untuk mendengar tanpa jeda.</string>
+    <string name="premium_next_ad">Perkiraan iklan berikutnya dalam %1$d menit.</string>
     <string name="premium_email_label">Email akun</string>
     <string name="premium_email_support">Gunakan email yang sama dengan pembayaran.</string>
     <string name="premium_check">Cek status</string>

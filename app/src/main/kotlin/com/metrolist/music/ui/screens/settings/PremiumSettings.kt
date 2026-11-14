@@ -50,12 +50,11 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
 import com.metrolist.music.R
-import com.metrolist.music.constants.AdEveryNSongsKey
 import com.metrolist.music.constants.AdSecondsKey
-import com.metrolist.music.constants.DEFAULT_AD_EVERY_N_SONGS
 import com.metrolist.music.constants.DEFAULT_AD_SECONDS
 import com.metrolist.music.constants.DEFAULT_PREMIUM_SERVER_URL
 import com.metrolist.music.constants.IsPremiumKey
@@ -102,10 +101,9 @@ fun PremiumSettingsScreen(
     var accountNamePref by rememberPreference(AccountNameKey, "")
     var isPremiumPref by rememberPreference(IsPremiumKey, false)
     var expiryPref by rememberPreference(PremiumExpiryKey, 0L)
-    var songsPref by rememberPreference(SongsSinceAdKey, 0)
+    val nextAdInMs by AdState.nextAdInMs.collectAsStateWithLifecycle()
     var serverPref by rememberPreference(PremiumServerUrlKey, DEFAULT_PREMIUM_SERVER_URL)
     var devPref by rememberPreference(PremiumDevModeKey, false)
-    var adEveryPref by rememberPreference(AdEveryNSongsKey, DEFAULT_AD_EVERY_N_SONGS)
     var adSecondsPref by rememberPreference(AdSecondsKey, DEFAULT_AD_SECONDS)
 
     // Premium follows the signed-in account. Typing an arbitrary premium email
@@ -252,8 +250,8 @@ fun PremiumSettingsScreen(
                                 stringResource(R.string.premium_active_desc) +
                                     if (expiryPref > 0) " " + context.getString(R.string.premium_valid_until, Date(expiryPref * 1000).toString()) else ""
                             } else {
-                                context.getString(R.string.premium_free_desc, adEveryPref) +
-                                    " " + context.getString(R.string.premium_next_ad, (adEveryPref - songsPref).coerceAtLeast(0))
+                                stringResource(R.string.premium_free_desc) +
+                                    (if (nextAdInMs > 0) " " + context.getString(R.string.premium_next_ad, ((nextAdInMs + 59_999) / 60_000).toInt()) else "")
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -20,45 +20,36 @@ fun isLegacyPremiumServerUrl(url: String): Boolean {
     return host.equals(LEGACY_PREMIUM_SERVER_HOST, ignoreCase = true)
 }
 
+/** Ad breaks are scheduled by listening time, not by track count: one random break every 7-12 min. */
+const val AD_INTERVAL_MIN_MINUTES = 7
+const val AD_INTERVAL_MAX_MINUTES = 12
+
+/** Random break interval in milliseconds, inclusive of both ends. */
+fun randomAdIntervalMs(random: kotlin.random.Random): Long {
+    val minutes = AD_INTERVAL_MIN_MINUTES +
+        random.nextInt(AD_INTERVAL_MAX_MINUTES - AD_INTERVAL_MIN_MINUTES + 1)
+    return minutes * 60_000L
+}
+
 /** Pure ad-gating rules. */
 object AdGate {
-    /** True when an ad must play before the next track. */
-    fun shouldShowAd(
+    /** True when a break is due right now. */
+    fun shouldStartBreak(
         isPremium: Boolean,
-        songsSinceAd: Int,
-        adEveryNSongs: Int,
+        elapsedMs: Long,
+        nextAtMs: Long,
+        adShowing: Boolean,
+        casting: Boolean,
+        playing: Boolean,
     ): Boolean {
-        if (isPremium) return false
-        val every = adEveryNSongs.coerceIn(1, 100)
-        return songsSinceAd >= every
+        if (isPremium || adShowing || casting || !playing) return false
+        return elapsedMs >= nextAtMs
     }
-
-    /** Counter value after one song finished (call only when no ad was shown). */
-    fun nextCounter(songsSinceAd: Int): Int = (songsSinceAd + 1).coerceAtLeast(0)
 
     /** Media id of the inserted video-ad queue item. */
     const val AD_MEDIA_ID = "beatplay-ad"
 
     fun isAdMediaId(id: String?): Boolean = id == AD_MEDIA_ID
-
-    /** What to do when one song just finished naturally. Returns (action, newCounter). */
-    fun decideAfterSong(
-        isPremium: Boolean,
-        songsSinceAd: Int,
-        adEveryNSongs: Int,
-        casting: Boolean,
-    ): Pair<AdDecision, Int> {
-        val newCount = nextCounter(songsSinceAd)
-        val action =
-            if (!casting && shouldShowAd(isPremium, newCount, adEveryNSongs)) AdDecision.INSERT_AD
-            else AdDecision.COUNT_ONLY
-        return action to newCount
-    }
-}
-
-enum class AdDecision {
-    COUNT_ONLY,
-    INSERT_AD,
 }
 
 const val PROOF_PHOTO_MAX_BYTES: Long = 4L * 1024 * 1024

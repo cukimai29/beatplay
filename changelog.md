@@ -1,5 +1,11 @@
 # Changelog
 
+## [v1.4.2] - 2026-11-14
+
+### Changed
+- **ads:** Free accounts now get one short ad break at a random 7–12 minute interval of listening time instead of after every 3 songs. The ad is queued after the current song so it never cuts a track in half, and it still shows for Premium-free listening when casting.
+- **premium:** The Premium screen shows the estimated minutes until the next break instead of a song counter.
+
 ## [v1.4.1] - 2026-11-14
 
 ### Fixed

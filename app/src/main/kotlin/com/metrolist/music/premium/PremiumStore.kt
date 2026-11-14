@@ -58,16 +58,3 @@ suspend fun Context.writePremium(update: PremiumSnapshot): Boolean =
         it[AdSecondsKey] = update.adSeconds
         it[PremiumDevModeKey] = update.devMode
     }
-
-suspend fun Context.recordSongPlayedForAds() {
-    val snap = readPremium()
-    safeDataStoreEdit { it[SongsSinceAdKey] = AdGate.nextCounter(snap.songsSinceAd) }
-}
-
-suspend fun Context.setSongsSinceAd(count: Int) {
-    safeDataStoreEdit { it[SongsSinceAdKey] = count.coerceAtLeast(0) }
-}
-
-suspend fun Context.resetAdCounter() {
-    safeDataStoreEdit { it[SongsSinceAdKey] = 0 }
-}
