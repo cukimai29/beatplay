@@ -1,9 +1,15 @@
 """BeatPlay brand assets.
 
-One design, every asset. Everything is rendered from the canonical logo at
-``web/img/logobaru.jpeg`` so the app icon (Compose window + tray, Linux package,
-Windows .ico), the Android launcher, the website favicon/brand lockup and the
-promo mark can never drift apart again.
+Everything is rendered from the canonical emblem at ``app/iconv2.jpeg``:
+a 2048x2048 square with the neon "B" mark centred on its dark background.
+The app icon (Compose window + tray, Linux package, Windows .ico), the
+website favicon/brand mark, the website hero lockup and the promo mark all
+come from it, so they can never drift apart.
+
+The hero lockup (``logo-lockup.png``) composes the emblem above the
+"BeatPlay" wordmark set in Plus Jakarta Sans ExtraBold — "Beat" in ink
+white, "Play" in the brand gradient — matching the site's ``.brand`` styling.
+It is a fixed 1280x1148 canvas to match the <img> attributes in index.html.
 
 Run:  python make_logo.py
 """
@@ -11,66 +17,150 @@ from __future__ import annotations
 
 import base64
 import io
+import math
 import os
 
-from PIL import Image, ImageDraw
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-SOURCE = os.path.join(ROOT, "web", "img", "logobaru.jpeg")
-
-# The emblem sits above the wordmark. This square crop keeps the full neon glow
-# and stops just before the "BeatPlay" letters.
-# Center the visible mark (including its glow) rather than the square source canvas.
-# The source artwork is vertically low because the wordmark sits underneath it.
-EMBLEM_CROP = (285, 150, 1305, 1170)
-# Emblem + wordmark, with a little breathing room.
-LOCKUP_CROP = (121, 98, 1415, 1259)
+APP_SOURCE = os.path.join(ROOT, "app", "iconv2.jpeg")
+JAKARTA_FONT = os.path.join(ROOT, "promo", "assets", "PlusJakartaSans.ttf")
 
 # The rounded-square app tile uses the same corner ratio as a squircle.
 TILE_RADIUS_RATIO = 0.225
 ICON_SIZE = 1024
 WEB_ICON_SIZE = 512
 
+# Site palette (web/assets/site.css :root).
+INK = (247, 243, 255)
+GRAD_STOPS = (
+    (0.00, (255, 79, 216)),   # --pink
+    (0.52, (168, 85, 247)),   # --violet
+    (1.00, (99, 102, 241)),   # --indigo
+)
+GRAD_ANGLE = 115.0  # CSS linear-gradient(115deg, ...)
 
-def load_source() -> Image.Image:
-    if not os.path.exists(SOURCE):
-        raise SystemExit(f"Logo source not found: {SOURCE}")
-    return Image.open(SOURCE).convert("RGB")
+# Lockup canvas, fixed to match index.html's <img width/height>.
+LOCKUP_W, LOCKUP_H = 1280, 1148
+LOCKUP_EMBLEM_TOP = 165
+LOCKUP_EMBLEM_HEIGHT = 720
+LOCKUP_TEXT_TOP = 905
+LOCKUP_FONT_SIZE = 152
+LOCKUP_TRACKING = -0.045  # em, same as the site's .brand
+
+
+def load_app_source() -> Image.Image:
+    if not os.path.exists(APP_SOURCE):
+        raise SystemExit(f"Logo source not found: {APP_SOURCE}")
+    return Image.open(APP_SOURCE).convert("RGB")
 
 
 def rounded_icon(size: int = ICON_SIZE) -> Image.Image:
     """Square emblem tile with transparent rounded corners."""
-    src = load_source().crop(EMBLEM_CROP).resize((size, size), Image.LANCZOS)
+    src = load_app_source()
+    tile = src.resize((size, size), Image.LANCZOS).convert("RGBA")
     mask = Image.new("L", (size, size), 0)
     ImageDraw.Draw(mask).rounded_rectangle(
         [0, 0, size - 1, size - 1],
         radius=int(size * TILE_RADIUS_RATIO),
         fill=255,
     )
-    out = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    out.paste(src, (0, 0), mask)
-    return out
+    tile.putalpha(mask)
+    return tile
 
 
-def lockup() -> Image.Image:
-    """Emblem + wordmark with the near-black JPEG background keyed to alpha.
+def _emblem_keyed() -> Image.Image:
+    """The emblem with its navy background keyed to alpha, glow preserved.
 
-    The alpha comes from the brightest channel (the JPEG background is
-    near-black, so it keys out cleanly) while the colour is left untouched, so
-    compositing it on the dark website reproduces the original glow instead of
-    blowing the faint halo out to full saturation.
+    The background peak sits around 56-70 (JPEG noise) and the mark core
+    starts around 140, so a ramp between 72 and 140 drops the background
+    while keeping the halo.
     """
-    try:
-        import numpy as np
-    except ImportError:  # pragma: no cover - dev tooling only
-        return load_source().crop(LOCKUP_CROP)
-
-    src = load_source().crop(LOCKUP_CROP)
-    rgb = np.asarray(src).astype(np.float32)
+    rgb = np.asarray(load_app_source()).astype(np.float32)
     peak = rgb.max(axis=2)
-    alpha = np.clip((peak - 8.0) / 247.0, 0.0, 1.0) * 255.0
-    rgba = np.dstack([rgb, alpha]).astype(np.uint8)
-    return Image.fromarray(rgba, "RGBA")
+    alpha = np.clip((peak - 72.0) / 68.0, 0.0, 1.0) * 255.0
+    return Image.fromarray(np.dstack([rgb, alpha]).astype(np.uint8), "RGBA")
+
+
+def _gradient(w: int, h: int) -> Image.Image:
+    """The site brand gradient (115deg pink -> violet 52% -> indigo)."""
+    x = np.arange(w, dtype=np.float32)
+    y = np.arange(h, dtype=np.float32)
+    gx, gy = np.meshgrid(x, y)
+    ang = math.radians(GRAD_ANGLE)
+    dx, dy = math.sin(ang), -math.cos(ang)
+    proj = gx * dx + gy * dy
+    pmin, pmax = float(proj.min()), float(proj.max())
+    t = (proj - pmin) / max(pmax - pmin, 1e-6)
+    out = np.zeros((h, w, 3), dtype=np.float32)
+    for i in range(3):
+        out[..., i] = np.interp(t, [s[0] for s in GRAD_STOPS], [s[1][i] for s in GRAD_STOPS])
+    return Image.fromarray(out.astype(np.uint8), "RGB")
+
+
+def _draw_tracked(draw: ImageDraw.ImageDraw, xy, text, font, tracking_px, fill):
+    """Draw text with per-letter tracking (pixels) like the site's .brand."""
+    x, y = xy
+    for ch in text:
+        draw.text((x, y), ch, font=font, fill=fill)
+        x += font.getlength(ch) + tracking_px
+    return x
+
+
+def web_lockup() -> Image.Image:
+    """Emblem above the "BeatPlay" wordmark, transparent 1280x1148 canvas."""
+    emblem = _emblem_keyed()
+    # Crop to the visible mark (plus glow) with a little padding.
+    alpha = np.asarray(emblem.getchannel("A"))
+    ys, xs = np.where(alpha > 16)
+    pad = 24
+    box = (
+        max(xs.min() - pad, 0), max(ys.min() - pad, 0),
+        min(xs.max() + pad, emblem.width), min(ys.max() + pad, emblem.height),
+    )
+    emblem = emblem.crop(box)
+    scale = LOCKUP_EMBLEM_HEIGHT / emblem.height
+    emblem = emblem.resize(
+        (round(emblem.width * scale), LOCKUP_EMBLEM_HEIGHT), Image.LANCZOS
+    )
+
+    canvas = Image.new("RGBA", (LOCKUP_W, LOCKUP_H), (0, 0, 0, 0))
+    ex = (LOCKUP_W - emblem.width) // 2
+    canvas.alpha_composite(emblem, (ex, LOCKUP_EMBLEM_TOP))
+
+    if not os.path.exists(JAKARTA_FONT):
+        raise SystemExit(
+            f"Brand font not found: {JAKARTA_FONT} "
+            "(variable TTF from Google Fonts, weight axis 200-800)"
+        )
+    font = ImageFont.truetype(JAKARTA_FONT, LOCKUP_FONT_SIZE)
+    font.set_variation_by_axes([800])
+
+    word = "BeatPlay"
+    tracking_px = LOCKUP_TRACKING * LOCKUP_FONT_SIZE
+    total = sum(font.getlength(ch) for ch in word) + tracking_px * (len(word) - 1)
+    x = (LOCKUP_W - total) / 2
+    y = LOCKUP_TEXT_TOP
+
+    # "Beat" in ink white.
+    beat_mask = Image.new("L", (LOCKUP_W, LOCKUP_H), 0)
+    d = ImageDraw.Draw(beat_mask)
+    _draw_tracked(d, (x, y), "Beat", font, tracking_px, 255)
+    canvas = Image.composite(
+        Image.new("RGBA", (LOCKUP_W, LOCKUP_H), INK + (255,)), canvas, beat_mask
+    )
+
+    # "Play" in the brand gradient.
+    play_x = x + font.getlength("Beat") + tracking_px * 4
+    play_w = sum(font.getlength(ch) for ch in "Play") + tracking_px * 3
+    play_mask = Image.new("L", (LOCKUP_W, LOCKUP_H), 0)
+    d = ImageDraw.Draw(play_mask)
+    _draw_tracked(d, (play_x, y), "Play", font, tracking_px, 255)
+    grad = _gradient(LOCKUP_W, LOCKUP_H).convert("RGBA")
+    grad.putalpha(play_mask)
+    canvas.alpha_composite(grad)
+    return canvas
 
 
 def save(img: Image.Image, path: str, **kw) -> None:
@@ -106,7 +196,7 @@ def write_svg(master: Image.Image) -> None:
 
 
 if __name__ == "__main__":
-    print("BeatPlay logo assets:")
+    print("BeatPlay brand assets (from app/iconv2.jpeg):")
     master = rounded_icon(ICON_SIZE)
     big = master.resize((WEB_ICON_SIZE, WEB_ICON_SIZE), Image.LANCZOS)
     small = master.resize((128, 128), Image.LANCZOS)
@@ -121,21 +211,16 @@ if __name__ == "__main__":
          sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64),
                 (128, 128), (256, 256)])
 
-    # Website favicon / brand mark.
+    write_svg(master)
+
+    # Website favicon / brand mark / hero lockup.
+    lockup = web_lockup()
     for folder in ("web/img", "BeatPlay-website/img"):
         save(small, f"{folder}/logo-128.png", optimize=True)
         save(big, f"{folder}/logo.png", optimize=True)
         save(tiny, f"{folder}/favicon-32.png", optimize=True)
-
-    # Full lockup for the hero / brand sections.
-    mark = lockup()
-    scale = 1280 / mark.width
-    mark = mark.resize((1280, round(mark.height * scale)), Image.LANCZOS)
-    for folder in ("web/img", "BeatPlay-website/img"):
-        save(mark, f"{folder}/logo-lockup.png", optimize=True)
+        save(lockup, f"{folder}/logo-lockup.png", optimize=True)
 
     # Promo poster logo.
     save(big, "promo/assets/logo.png", optimize=True)
-
-    write_svg(master)
     print("done")
