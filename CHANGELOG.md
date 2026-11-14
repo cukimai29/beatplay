@@ -1,5 +1,15 @@
 # Changelog
 
+## [v1.5.15] - 2026-11-14
+
+* fix(premium): resolve owner email for brand channels (baaf5c7)
+* fix(web): resolve downloads per platform, not global latest release (08f6c72)
+* chore(web): rebuild deploy zip with forward-slash entries (1515309)
+* fix(web): keep Android releases out of desktop feed (084c9fa)
+* chore(web): point Android download to v1.4.0 (826ebd3)
+* fix(premium): bind desktop entitlement to signed-in account (9851281)
+* feat(premium): BuatQris QRIS gateway + status fallback, default server domain (e26e975)
+
 ## [v1.5.14] - 2026-11-09
 
 * fix(playback): use independent Windows audio outputs for Automix (67d0b14)
