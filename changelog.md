@@ -1,5 +1,14 @@
 # Changelog
 
+## [v1.4.0] - 2026-11-14
+
+### Changed
+- **premium:** Premium is bound to the signed-in YouTube/Google account. The app detects that account email automatically; arbitrary emails can no longer be typed to check or claim a Premium status.
+- **premium:** Replaced the raw VPS IP with `https://premium.adminbeat.my.id`; saved URLs using the old IP migrate once automatically.
+
+### Added
+- **premium:** Refresh Premium status automatically at startup and whenever the signed-in account changes.
+
 ## [v1.3.1] - 2026-11-06
 
 ### Changed

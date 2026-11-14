@@ -548,7 +548,11 @@ val AdEveryNSongsKey = intPreferencesKey("adEveryNSongs")
 val AdSecondsKey = intPreferencesKey("adSeconds")
 val PremiumDevModeKey = booleanPreferencesKey("premiumDevMode")
 
-const val DEFAULT_PREMIUM_SERVER_URL = "http://52.141.21.195:8080"
+// One-time marker: installs whose saved server URL still points at the old raw
+// VPS IP get rewritten to the domain (see App.initializeSettings()).
+val PremiumServerUrlMigratedKey = booleanPreferencesKey("premiumServerUrlMigrated")
+
+const val DEFAULT_PREMIUM_SERVER_URL = "https://premium.adminbeat.my.id"
 const val DEFAULT_AD_EVERY_N_SONGS = 3
 const val DEFAULT_AD_SECONDS = 10
 

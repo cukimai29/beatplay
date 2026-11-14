@@ -63,6 +63,7 @@ import com.metrolist.music.constants.PremiumDevModeKey
 import com.metrolist.music.constants.PremiumEmailKey
 import com.metrolist.music.constants.PremiumExpiryKey
 import com.metrolist.music.constants.PremiumServerUrlKey
+import com.metrolist.music.constants.AccountEmailKey
 import com.metrolist.music.constants.SongsSinceAdKey
 import com.metrolist.music.premium.AdState
 import com.metrolist.music.premium.ManualQris
@@ -70,6 +71,7 @@ import com.metrolist.music.premium.OrderInfo
 import com.metrolist.music.premium.Plan
 import com.metrolist.music.premium.PremiumApi
 import com.metrolist.music.premium.isValidPremiumEmail
+import com.metrolist.music.premium.isLegacyPremiumServerUrl
 import com.metrolist.music.premium.photoMimeFor
 import com.metrolist.music.utils.rememberPreference
 import com.metrolist.music.utils.safeDataStoreEdit
@@ -95,7 +97,7 @@ fun PremiumSettingsScreen(
     val api = remember { PremiumApi() }
     DisposableEffect(api) { onDispose { api.close() } }
 
-    var emailPref by rememberPreference(PremiumEmailKey, "")
+    var accountEmailPref by rememberPreference(AccountEmailKey, "")
     var isPremiumPref by rememberPreference(IsPremiumKey, false)
     var expiryPref by rememberPreference(PremiumExpiryKey, 0L)
     var songsPref by rememberPreference(SongsSinceAdKey, 0)
@@ -104,7 +106,12 @@ fun PremiumSettingsScreen(
     var adEveryPref by rememberPreference(AdEveryNSongsKey, DEFAULT_AD_EVERY_N_SONGS)
     var adSecondsPref by rememberPreference(AdSecondsKey, DEFAULT_AD_SECONDS)
 
-    var email by remember(emailPref) { mutableStateOf(emailPref) }
+    // Premium follows the signed-in account. Typing an arbitrary premium email
+    // here would otherwise unlock the device for anyone who knows one.
+    val signedInEmail = remember(accountEmailPref) {
+        accountEmailPref.trim().lowercase().takeIf(::isValidPremiumEmail)
+    }
+    val email = signedInEmail.orEmpty()
     var busy by remember { mutableStateOf(false) }
     var msg by remember { mutableStateOf<String?>(null) }
     var plans by remember { mutableStateOf<List<Plan>?>(null) }
@@ -123,12 +130,16 @@ fun PremiumSettingsScreen(
     var photoMsg by remember { mutableStateOf<String?>(null) }
 
     suspend fun applyPremiumResult(premium: Boolean, expiry: Long?) {
+        // Entitlement always follows the login; a typed address is never trusted.
+        val bound = signedInEmail ?: return
         context.safeDataStoreEdit {
             it[IsPremiumKey] = premium
+            it[PremiumEmailKey] = bound
             if (premium) {
-                it[PremiumEmailKey] = email.trim().lowercase()
                 if (expiry != null) it[PremiumExpiryKey] = expiry else it.remove(PremiumExpiryKey)
                 it[SongsSinceAdKey] = 0
+            } else {
+                it.remove(PremiumExpiryKey)
             }
         }
     }
@@ -249,20 +260,24 @@ fun PremiumSettingsScreen(
                 }
             }
 
-            OutlinedTextField(
-                email, { email = it; msg = null }, Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.premium_email_label)) },
-                supportingText = { Text(stringResource(R.string.premium_email_support)) },
-                singleLine = true,
-                isError = email.isNotBlank() && !isValidPremiumEmail(email),
-            )
+            if (signedInEmail == null) {
+                Text(
+                    "Login YouTube/Google diperlukan agar email Premium terdeteksi otomatis.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            } else {
+                Text("Akun login: $signedInEmail", style = MaterialTheme.typography.bodyMedium)
+            }
             var server by remember(serverPref) { mutableStateOf(serverPref) }
-            OutlinedTextField(
-                server, { server = it; msg = null }, Modifier.fillMaxWidth(),
-                label = { Text("Server Premium") },
-                supportingText = { Text("URL server BeatPlay (dari admin).") },
-                singleLine = true,
-            )
+            if (showAdvanced) {
+                OutlinedTextField(
+                    server, { server = it; msg = null }, Modifier.fillMaxWidth(),
+                    label = { Text("Server Premium") },
+                    supportingText = { Text("URL server BeatPlay (dari admin).") },
+                    singleLine = true,
+                )
+            }
             if (showAdvanced) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Switch(devPref, { devPref = it })
@@ -274,8 +289,8 @@ fun PremiumSettingsScreen(
                     busy = true
                     msg = null
                     scope.launch {
-                        serverPref = server.trim()
-                        runCatching { api.refresh(server.trim(), email) }
+                        serverPref = if (isLegacyPremiumServerUrl(server)) DEFAULT_PREMIUM_SERVER_URL else server.trim()
+                        runCatching { api.refresh(serverPref, email) }
                             .onSuccess { (premium, expiry) ->
                                 applyPremiumResult(premium, expiry)
                                 msg = if (premium) context.getString(R.string.premium_active_for, email)
@@ -284,7 +299,7 @@ fun PremiumSettingsScreen(
                             .onFailure { msg = context.getString(R.string.premium_check_failed, it.message ?: it.javaClass.simpleName) }
                         busy = false
                     }
-                }, enabled = !busy && isValidPremiumEmail(email) && server.isNotBlank()) {
+                }, enabled = !busy && signedInEmail != null && server.isNotBlank()) {
                     Text(stringResource(if (busy) R.string.premium_checking else R.string.premium_check))
                 }
                     if (isPremiumPref) {
@@ -326,14 +341,14 @@ fun PremiumSettingsScreen(
                     }
                 }
             }
-            val emailOk = emailPref.let { isValidPremiumEmail(it) } || isValidPremiumEmail(email)
-            if (!emailOk) Text(stringResource(R.string.premium_need_email), style = MaterialTheme.typography.bodySmall)
+            val emailOk = signedInEmail != null
+            if (!emailOk) Text("Login akun dulu untuk membeli Premium.", style = MaterialTheme.typography.bodySmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button({
                     val plan = selected ?: return@Button
                     busy = true
                     scope.launch {
-                        runCatching { api.createOrder(serverPref, email.ifBlank { emailPref }, plan) }
+                        runCatching { api.createOrder(serverPref, requireNotNull(signedInEmail), plan) }
                             .onSuccess {
                                 order = it
                                 polling = true

@@ -40,6 +40,15 @@ class PremiumGateTest {
     }
 
     @Test
+    fun legacyPremiumServerUrlDetectionOnlyMatchesOldRawIp() {
+        assertTrue(isLegacyPremiumServerUrl("http://52.141.21.195:8080"))
+        assertTrue(isLegacyPremiumServerUrl("https://52.141.21.195/api"))
+        assertFalse(isLegacyPremiumServerUrl("https://premium.adminbeat.my.id"))
+        assertFalse(isLegacyPremiumServerUrl("https://52.141.21.195.example.com"))
+        assertFalse(isLegacyPremiumServerUrl("https://example.com/52.141.21.195"))
+    }
+
+    @Test
     fun premiumNeverGetsAds() {
         assertFalse(AdGate.shouldShowAd(true, 99, 3))
         assertFalse(AdGate.shouldShowAd(false, 2, 3))

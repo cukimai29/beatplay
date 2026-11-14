@@ -11,6 +11,15 @@ fun isValidPremiumEmail(email: String) = EMAIL_RE.matches(email.trim())
 
 fun normalizePremiumEmail(email: String) = email.trim().lowercase()
 
+/** Host of the old raw-IP premium server; installs still pointing at it are migrated. */
+const val LEGACY_PREMIUM_SERVER_HOST = "52.141.21.195"
+
+/** True when a saved premium server URL still points at the old raw-IP address. */
+fun isLegacyPremiumServerUrl(url: String): Boolean {
+    val host = url.trim().trimEnd('/').substringAfter("://").substringBefore('/').substringBefore(':')
+    return host.equals(LEGACY_PREMIUM_SERVER_HOST, ignoreCase = true)
+}
+
 /** Pure ad-gating rules. */
 object AdGate {
     /** True when an ad must play before the next track. */

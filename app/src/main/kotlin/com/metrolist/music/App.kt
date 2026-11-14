@@ -39,6 +39,9 @@ import com.metrolist.music.utils.InnerTubeXPlayer
 import com.metrolist.music.utils.dataStore
 import com.metrolist.music.utils.safeDataStoreEdit
 import com.metrolist.music.utils.reportException
+import com.metrolist.music.premium.PremiumApi
+import com.metrolist.music.premium.isValidPremiumEmail
+import com.metrolist.music.premium.normalizePremiumEmail
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -172,6 +175,10 @@ class App :
             KuGou.useTraditionalChinese = true
         }
 
+        migratePremiumServerUrl(settings)
+        settings = dataStore.data.first()
+        refreshPremiumForSignedInAccount(settings)
+
         // Initialize LastFM with API keys from BuildConfig (GitHub Secrets)
         LastFM.initialize(
             apiKey = BuildConfig.LASTFM_API_KEY.takeIf { it.isNotEmpty() } ?: "",
@@ -221,7 +228,75 @@ class App :
         nm.createNotificationChannel(channel)
     }
 
+    /** Replace the old public-IP endpoint once without overwriting a custom server URL. */
+    private suspend fun migratePremiumServerUrl(settings: androidx.datastore.preferences.core.Preferences) {
+        if (settings[PremiumServerUrlMigratedKey] == true) return
+        val savedUrl = settings[PremiumServerUrlKey]
+        safeDataStoreEdit { prefs ->
+            if (savedUrl != null && com.metrolist.music.premium.isLegacyPremiumServerUrl(savedUrl)) {
+                prefs[PremiumServerUrlKey] = DEFAULT_PREMIUM_SERVER_URL
+            }
+            prefs[PremiumServerUrlMigratedKey] = true
+        }
+    }
+
+    /**
+     * Premium belongs to the Google/YouTube account saved by the app, never to an email typed
+     * on the Premium screen. A failed network request leaves the previously known status intact.
+     */
+    private suspend fun refreshPremiumForSignedInAccount(settings: androidx.datastore.preferences.core.Preferences) {
+        val accountEmail = settings[AccountEmailKey]
+            ?.let(::normalizePremiumEmail)
+            ?.takeIf(::isValidPremiumEmail)
+        if (accountEmail == null) {
+            safeDataStoreEdit { prefs ->
+                prefs[IsPremiumKey] = false
+                prefs.remove(PremiumEmailKey)
+                prefs.remove(PremiumExpiryKey)
+                prefs[SongsSinceAdKey] = 0
+            }
+            return
+        }
+
+        // Never carry one account's cached entitlement over to another login while the
+        // network check is pending or unavailable.
+        if (settings[PremiumEmailKey]?.let(::normalizePremiumEmail) != accountEmail) {
+            safeDataStoreEdit { prefs ->
+                prefs[PremiumEmailKey] = accountEmail
+                prefs[IsPremiumKey] = false
+                prefs.remove(PremiumExpiryKey)
+                prefs[SongsSinceAdKey] = 0
+            }
+        }
+
+        val serverUrl = settings[PremiumServerUrlKey] ?: DEFAULT_PREMIUM_SERVER_URL
+        val api = PremiumApi()
+        try {
+            runCatching { api.refresh(serverUrl, accountEmail) }
+                .onSuccess { (premium, expiry) ->
+                    safeDataStoreEdit { prefs ->
+                        // Confirm the result is stored against the signed-in account only.
+                        prefs[PremiumEmailKey] = accountEmail
+                        prefs[IsPremiumKey] = premium
+                        if (premium && expiry != null) prefs[PremiumExpiryKey] = expiry
+                        else prefs.remove(PremiumExpiryKey)
+                        if (premium) prefs[SongsSinceAdKey] = 0
+                    }
+                }
+                .onFailure { Timber.w(it, "Premium refresh skipped; keeping cached status") }
+        } finally {
+            api.close()
+        }
+    }
+
     private fun observeSettingsChanges() {
+        applicationScope.launch {
+            dataStore.data.map { it[AccountEmailKey] }.distinctUntilChanged().collect {
+                // Login/logout changes the account email. Re-check entitlement immediately;
+                // the Premium screen does not need a manually typed address or button press.
+                refreshPremiumForSignedInAccount(dataStore.data.first())
+            }
+        }
         applicationScope.launch {
             dataStore.data.map { it[OfflineModeKey] ?: false }.distinctUntilChanged().collect {
                 YouTube.offlineMode = it
