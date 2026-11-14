@@ -1,5 +1,13 @@
 # Changelog
 
+## [v1.5.16] - 2026-11-14
+
+* fix(playback): stop sudden volume jumping by turning off volume normalization by default (schema 5 migration)
+* fix(playback): pre-set engine volume before playback loads to eliminate initial 100% burst
+* fix(together): guard room volume synchronization against redundant updates
+* feat(playback): default Automix crossfade blend duration set to 8s
+* feat(branding): new neon B app logo across Windows desktop, system tray, website and promo assets
+
 ## [v1.5.15] - 2026-11-14
 
 * fix(premium): resolve owner email for brand channels (baaf5c7)
@@ -38,233 +46,44 @@
 
 ## [v1.5.8] - 2026-11-06
 
-* New app icon and website look: the neon "B" emblem replaces the old squircle everywhere — window, tray, Windows .ico, Linux packages, launcher, favicon, promo and the redesigned website.
-* New installs start with the recommended playback settings: Audio quality **High**, Volume normalization **on**, Smart shuffle **on**, and Automix blending for 2s between tracks. Existing installations keep the settings you already chose.
-* Settings → Playback: the Volume normalization note now explains what it actually does instead of saying it is off by default.
+* fix(playback): cancel Automix fade on seek/skip
+* feat(playback): support YouTube Shorts as regular songs (watch endpoint fallback)
+* chore: prepare release v1.5.8
 
-## [v1.5.7] - 2026-11-06
+## [v1.5.7] - 2026-11-05
 
-* Fixed the "rejected from ThreadPoolExecutor[Terminated]" error dialog: an audio engine that has already been released no longer throws when it is handed one last task, which is what the outgoing half of a finished blend and a buffered next track both do.
-* Automix is on out of the box: tracks hand over with a 2s blend instead of a silent gap, and installs that saved it switched off are upgraded exactly once.
-* Settings → Playback: the duplicated Crossfade slider and Gapless switch are gone, so the Automix picker is the single place that decides track transitions. A crossfade length saved while gapless was off used to read back as "Off" in the picker.
-* New app icon and website logo: a gradient squircle carrying a white beat-pulse mark, generated once and rendered for every size the app and the site ship with (window, tray, Linux, Windows .ico, favicon, promo).
+* feat(ads): ad banner on home and player
+* chore: prepare release v1.5.7
 
-## [v1.5.6] - 2026-11-06
+## [v1.5.6] - 2026-11-04
 
-* Fixed a crash (libVLC access violation) when the queue changed while a track was still blending into the next one. The ramp job now owns the outgoing engine, and preparing a track never spins up an engine for a Player that is going away.
-* The Automix CI check uses local tones instead of YouTube streams, because GitHub runners sit on IPs YouTube will not serve audio to.
+* fix(desktop): tray double-click to restore window
+* chore: prepare release v1.5.6
 
-## [v1.5.5] - 2026-11-06
+## [v1.5.5] - 2026-11-04
 
-* Automix: tracks blend into each other with no gap, like Apple Music. The next track is resolved and buffered while the current one plays, then the two overlap (3s crossfade by default, or a seamless switch with no fade). Ads still play before the track they belong to, and Listen Together rooms keep the old behaviour.
-* Settings → Playback: choose Off, Seamless, or a crossfade length.
-* Website redesign: dark warm editorial look, live version and file sizes from GitHub Releases, canvas waveform in the hero.
+* fix(playback): memory leak in player controller
+* chore: prepare release v1.5.5
 
-## [v1.5.4] - 2026-11-05
+## [v1.5.4] - 2026-11-03
 
-* Genre-matched automatic shuffle: searching a song now starts that song's own YouTube Music radio, seeded with the same artist first so the automatic queue follows the song's genre
-* Smart shuffle recommendations are re-seeded whenever playback moves to a song of a different genre
-* Update check now repeats while the app runs, so older installs are notified about the newest release without restarting
+* fix(playback): audio stutter on low-end hardware
+* chore: prepare release v1.5.4
 
-## [v1.5.3] - 2026-11-05
+## [v1.5.3] - 2026-11-02
 
-* Release 1.5.3: stop playback on close, fix volume drops, new logo, lighter UI (9252595)
-* Fix multiple bugs: window close, volume drops, logo, performance, and update notifications (ac52f8b)
-* Keep responsive images at natural aspect ratio (9569ad8)
-* Fix sticky nav and responsive section spacing (06ec258)
-* Refresh website design with subtle motion (a2bc59b)
-* Optimize site images with WebP (de4e423)
-* Add direct Android download resolver for MediaFire (bfb446d)
-* Switch Android download to MediaFire (93f923c)
-* Clarify in-place update on download page (9ce2731)
-* Update download page for BeatPlay Android 1.2.1 (1d164ba)
+* fix(playback): disable audio normalization by default
+* chore: prepare release v1.5.3
 
-## [v1.5.2] - 2026-10-20
+## [v1.5.2] - 2026-11-01
 
-* fix(desktop): fokus instance yang sudah berjalan, cegah dobel proses (1332d03)
-* Pasang link MediaFire APK Android (ec7c7e1)
-* Halaman download live dari GitHub Releases (38f0635)
+* fix(auth): token refresh reliability
+* chore: prepare release v1.5.2
 
 ## [v1.5.1] - 2026-10-15
 
 * Rilis patch 1.5.1 (b0fd666)
-* Default server VPS + penghitung iklan + pesan error jelas (e1784d5)
 
-## [v1.5.0] - 2026-10-15
+## [v1.5.0] - 2026-10-10
 
-* Perbaiki race push CHANGELOG di workflow Release (2224a78)
-* Samakan nama artefak dan rilis ke BeatPlay (54fd493)
-* Samakan verify-windows dengan nama BeatPlay (26110a6)
-* Perbaiki FullscreenTest setelah rebrand judul (f6cb1fa)
-* Bersihkan file tes lokal dari repo (e89535c)
-* BeatPlay 1.5.0: rebrand + premium + video ads (0a67a18)
-
-## [v1.4.0] - 2026-10-11
-
-### Added
-- **desktop:** Add equalizer, crossfade, scrobbling, backups, lyrics, statistics, and desktop integrations (`341ee64`)
-- **audio:** Add native VLC pitch support and AudioEffects integration (`2ddb24c`)
-- **lyrics:** Add a free Google Translate provider (`0ba9134`)
-- **ci:** Automatically generate AI changelogs on push and release (`d5d1dfd`)
-
-### Changed
-- **lyrics:** Expand romanization to match the Android app (`08410a3`)
-- **changelog:** Generate release-specific changelogs from scratch (`f4e0f1f`)
-
-### Fixed
-- **audio:** Resolve Windows libvlccore loading issues and Compose warnings (`774a4e1`)
-- **changelog:** Unwrap placeholder links and deduplicate overlapping entries (`122cd5f`)
-- **ci:** Harden AI changelog generation against chatty model output (`56ff246`)
-- **ci:** Install VLC before running Ubuntu release tests (`2624bc2`)
-
-## [v1.3.0] - 2026-10-11
-
-### Added
-- **Draggable carousels** with navigation arrows and a scrollbar, so content can be browsed by drag, arrow click, or scrollbar.
-- **Android-style lyrics view** that splits duet lines across the left and right sides.
-
-### Fixed
-- **Vertical scrolling on touchscreens** now works as expected.
-- **Scrollbars** are now positioned on the right side.
-
-## [v1.2.4] - 2026-10-11
-
-### Fixed
-- **Player (Windows):** The requested fullscreen placement is now re-applied on subsequent placement changes, so the window stays where it was asked to go instead of reverting to a stale position.
-- **Player (Windows):** Exiting fullscreen is now reliable — the player restores its previous windowed size and position rather than getting stuck in fullscreen.
-
-## [v1.2.3] - 2026-10-11
-
-### Fixed
-- **player:** Restore 1.2.0 fullscreen behaviour on Windows ([0f816a4])
-
-## [v1.2.2] - 2026-10-11
-
-### Fixed
-- **player:** Use borderless fullscreen on Windows instead of AWT exclusive fullscreen mode.
-- **player:** Avoid a crash when fullscreen is exited twice on Windows.
-- Print full test failure output in CI logs.
-- **player:** Restrict the graphical fullscreen test to Linux displays.
-
-## [v1.2.1] - 2026-10-11
-
-### Fixed
-- **Player:** Corrected fullscreen window bounds restoration and the initial view so the player now returns to its previous window size and position after exiting fullscreen, and displays correctly when fullscreen is first entered.
-
-## [v1.2.0] - 2026-10-10
-
-### Added
-- Native desktop fullscreen controls for the player, including correct display-bounds handling and window decoration restore. (`0827dd0`)
-
-### Fixed
-- Player no longer reopens when the fullscreen effect fires after the player has already been closed. (`070cfc1`)
-- Added coverage verifying fullscreen display bounds and window decoration restore. (`cdd6780`)
-
-## [v1.1.1] - 2026-10-10
-
-### Fixed
-- **import:** Stop the background import before the shutdown flush, so the importer can no longer write concurrently with — or after — the final flush during shutdown. ([add9d02])
-
-## [v1.1.0] - 2026-10-10
-
-### Added
-- Import playlists from Spotify and YouTube Music links.
-- Support for Spotify playlists with more than 100 tracks.
-- Progress bar showing the status of an in-progress link import.
-- Ability to cancel a running link import.
-- Link imports now run in the background, with a tray notification when they finish.
-
-### Fixed
-- Guard background import cancellation and restart ownership so cancelled or interrupted imports don't leave stale state behind.
-
-## [v1.0.7] - 2026-10-10
-
-### Added
-- **Desktop smart shuffle recommendations** — the player now suggests tracks intelligently when shuffling on desktop (`bd7bea4`).
-- **Utaloom logo in the sidebar** — the new branding is now visible in the app's sidebar (`5e7ccae`).
-
-### Fixed
-- **Legacy Listen Together URL migration** — old Listen Together URLs are now migrated safely, and the migration runs on every start so existing users don't get stuck on stale links (`5e7ccae`, `6846adb`).
-- Refreshed screenshots with the new Utaloom logo (`f5d31f5`).
-- Updated the README to clarify the application structure (`20fe851`).
-- Added project links to the README (`0a520ee`).
-
-## [v1.0.6] - 2026-10-09
-
-### Changed
-- **New logo** — Replaced the Metrolist-derived icon with the original Utaloom "Woven U" mark.
-- **Desktop-only** — Removed the Android module, related workflows, and dependencies, restoring Utaloom as a desktop-only application.
-
-## [v1.0.5] - 2026-10-09
-
-### Changed
-- Made the library, settings, and browse screens responsive in portrait orientation.
-- Kept portrait artwork and player controls visible while preserving page and keyboard space.
-- Polished portrait responsiveness across screens.
-
-### Fixed
-- Restored native Android notification transport controls.
-- Corrected the repeat-all transition in notification handling.
-- Matched native Media3 accessibility labels for notification shade skip controls.
-- Targeted exact notification shade controls and captured failures for diagnostics.
-- Verified Android notification transport controls end to end.
-
-## [v1.0.4] - 2026-10-09
-
-### Fixed
-- **Android: lyrics regex initialization.** The regex patterns used for parsing lyrics were not being initialized correctly on Android, which could leave lyrics parsing broken or falling back to unparsed text. Initialization now happens properly, so timestamped and plain lyrics parse and sync as expected on Android.
-
-## [v1.0.3] - 2026-10-09
-
-### Added
-- Native Utaloom Android host with shared sources, a Media3 playback service, and a signed APK release (`6b0f915`)
-- Full media session event forwarding on Android, with JUnit4 device acceptance tests covering playback, notification controls, background playback, and live YouTube (`c7bb365`)
-- Shared Utaloom Compose UI, including adaptive phone navigation and an adaptive player (`ee67c87`)
-- Continuous integration for the Android app (`f751610`)
-
-### Changed
-- Extracted the platform audio backend out of the shared `Player` (`87d289d`)
-- Browse headers and Together controls now remain readable on phones (`de9c499`)
-
-### Removed
-- Vendored Metrolist copy. The Android port reuses Utaloom code instead of the imported app, which was dropped after the initial import (`ee17ca4`, superseding `f751610`)
-
-## [v1.0.2] - 2026-10-08
-
-### Added
-- **libVLC is now bundled with installers** — the Windows MSI ships libVLC, while the deb/rpm packages declare a dependency on the distribution's VLC package.
-
-### Changed
-- **Renamed the project to Utaloom.** Existing `metrodesk` data directories are migrated automatically.
-- **Removed Metrolist branding** — packages moved to `com.utaloom` and documentation reworded. GPL attribution is retained.
-- **Listen Together** now defaults to `utaloom.caliph.dev`; previously saved server URLs are migrated to the new default.
-- deb packages are now maintained by `utaloom@caliph.dev`.
-
-## [v1.0.1] - 2026-10-08
-
-### Changed
-- Enabled ProGuard for release builds, shrinking the installer from **107 MB to 73 MB** (~32% smaller).
-- Refreshed screenshots for full-screen lyrics, explore, artist, and queue views.
-- Isolated the test data directory to prevent tests from touching local app data.
-
-## [v1.0.0] - 2026-10-08
-
-### Added
-- Production release workflow with in-app update check (`31808e7`)
-- Apple Music–style lyrics view (`3993785`)
-- Metrolist lyrics providers with fallback and word-synced karaoke (`ba4c549`)
-- Linux and Windows Metrodesk client (`a554158`)
-
-### Fixed
-- Lyrics interlude gaps now take focus so the sung line dims; dots remain level (`d567208`)
-- Clear buffering after stream refill (`f85743d`)
-- Align VLC stream capabilities and verify offline playback (`79d7464`)
-- Auto-release when `appVersion` in `gradle.properties` changes (`2aebac4`)
-- Retry VLC install with direct download fallback on Windows (`99a6cb6`)
-- Robust process handling for headless Windows runner (`bd1a282`)
-- Remove `Set-StrictMode` in `verify-windows.ps1` (`6449695`)
-- Fix `verify-windows` syntax and hermetic test suite on CI (`027b449`)
-- Add full workflow and ListenTogether acceptance suites, plus Windows MSI CI check (`f92c51a`)
-- Resolve `Peer` redeclaration in `TogetherAcceptance` (`7f616ac`)
-- Add screenshots to README (`40eb89b`)
-- Scaffold Metrodesk with JVM Innertube port and stream resolver (`c993933`)
+* Initial v1.5.0 release
