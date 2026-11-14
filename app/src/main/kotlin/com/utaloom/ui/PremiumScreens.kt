@@ -37,7 +37,7 @@ fun PremiumScreen() {
 fun PremiumSection() {
     val s by Stores.settings.state.collectAsState()
     val scope = rememberCoroutineScope()
-    var email by remember(s.premiumEmail) { mutableStateOf(s.premiumEmail ?: "") }
+    val email = s.accountEmail?.trim()?.lowercase().orEmpty()
     var busy by remember { mutableStateOf(false) }
     var msg by remember { mutableStateOf<String?>(null) }
     var server by remember(s.premiumServerUrl) { mutableStateOf(s.premiumServerUrl) }
@@ -71,8 +71,14 @@ fun PremiumSection() {
                 }
             }
         }
-        OutlinedTextField(email, { email = it; msg = null }, Modifier.fillMaxWidth(), label = { Text("Email akun") }, supportingText = { Text("Gunakan email yang sama dengan pembayaran.") }, singleLine = true, isError = email.isNotBlank() && !isValidEmail(email))
-        OutlinedTextField(server, { server = it; msg = null }, Modifier.fillMaxWidth(), label = { Text("Server Premium") }, supportingText = { Text("URL server BeatPlay (dari admin).") }, singleLine = true)
+        if (email.isBlank() || !isValidEmail(email)) {
+            Text("Login YouTube/Google diperlukan agar email Premium terdeteksi otomatis.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        } else {
+            Text("Akun login: $email", style = MaterialTheme.typography.bodyMedium)
+        }
+        if (dev) {
+            OutlinedTextField(server, { server = it; msg = null }, Modifier.fillMaxWidth(), label = { Text("Server Premium") }, supportingText = { Text("URL server BeatPlay (dari admin).") }, singleLine = true)
+        }
         if (dev) {
             var adVideo by remember(s.adVideoPath) { mutableStateOf(s.adVideoPath) }
             OutlinedTextField(adVideo, {
@@ -84,7 +90,8 @@ fun PremiumSection() {
             Button({
                 busy = true; msg = null
                 scope.launch {
-                    Stores.settings.update { it.copy(premiumServerUrl = server.trim()) }
+                    // The production server URL is not user-editable; only developer mode
+                    // exposes the override field above.
                     val r = PremiumRepository.refresh(email, server.trim())
                     msg = if (r.isSuccess && r.getOrNull() == true) "Premium aktif untuk $email."
                     else if (r.isSuccess) "$email belum premium."
@@ -92,7 +99,10 @@ fun PremiumSection() {
                     busy = false
                 }
             }, enabled = !busy && isValidEmail(email)) { Text(if (busy) "Mengecek…" else "Cek status") }
-            if (s.isPremium) TextButton({ Stores.settings.update { it.copy(isPremium = false, premiumEmail = null, premiumExpiry = null, songsSinceAd = 0) } }) { Text("Ganti akun") }
+            if (s.isPremium) TextButton({
+            Stores.settings.update { it.copy(isPremium = false, premiumEmail = null, premiumExpiry = null, songsSinceAd = 0) }
+            msg = "Premium lokal direset; akun login tetap sama."
+        }) { Text("Reset status lokal") }
         }
         msg?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         if (dev) {
@@ -169,8 +179,8 @@ fun BuyPremiumSection() {
                 }
             }
         }
-        val emailOk = s.premiumEmail?.let(::isValidEmail) == true
-        if (!emailOk) Text("Isi Gmail di bagian Premium di atas dulu, lalu klik Cek premium.", style = MaterialTheme.typography.bodySmall)
+        val emailOk = s.accountEmail?.let(::isValidEmail) == true
+        if (!emailOk) Text("Login YouTube/Google dulu untuk membeli Premium.", style = MaterialTheme.typography.bodySmall)
         Button({
             val email = s.premiumEmail ?: return@Button
             val plan = selected ?: return@Button

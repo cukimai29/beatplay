@@ -61,6 +61,26 @@ fun applySession() {
             Stores.settings.update { it.copy(visitorData = v) }
         }
     }.start()
+
+    // Premium follows the signed-in Google account, not a manually typed email.
+    val accountEmail = s.accountEmail?.trim()?.lowercase().orEmpty()
+    if (com.utaloom.premium.isValidEmail(accountEmail)) {
+        // Avoid showing the previous account's cached entitlement while the refresh is in flight.
+        if (s.premiumEmail?.trim()?.lowercase() != accountEmail) {
+            Stores.settings.update {
+                it.copy(isPremium = false, premiumEmail = accountEmail, premiumExpiry = null, songsSinceAd = 0)
+            }
+        }
+        Thread {
+            kotlinx.coroutines.runBlocking {
+                com.utaloom.premium.PremiumRepository.refresh(accountEmail, s.premiumServerUrl)
+            }
+        }.start()
+    } else if (s.isPremium || s.premiumEmail != null) {
+        Stores.settings.update {
+            it.copy(isPremium = false, premiumEmail = null, premiumExpiry = null, songsSinceAd = 0)
+        }
+    }
 }
 
 private enum class Panel { NONE, QUEUE, LYRICS }
