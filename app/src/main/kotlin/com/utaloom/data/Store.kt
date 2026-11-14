@@ -25,7 +25,7 @@ import java.io.File
  * saved settings had Automix switched off, so the first track hand-over is already
  * gapless instead of waiting for the user to find the setting.
  */
-private const val DEFAULT_CROSSFADE_SECONDS = 2
+private const val DEFAULT_CROSSFADE_SECONDS = 8
 
 /** Serializable song snapshot used for library, history, playlists and the persisted queue. */
 @Serializable
@@ -74,7 +74,9 @@ data class Settings(
     val dynamicColor: Boolean = true,
     val audioQuality: String = "HIGH", // AUTO | HIGH | LOW
     val volume: Int = 80,
-    val normalizeVolume: Boolean = true, // default on: quieter tracks stay audible, louder ones stop jumping out
+    // Off by default: per-track level changes were experienced as the volume jumping
+    // up and down on its own between songs. Users who want it can opt in in Settings.
+    val normalizeVolume: Boolean = false,
     val smartShuffle: Boolean = true,
     val cookie: String? = null,
     val visitorData: String? = null,
@@ -146,16 +148,16 @@ data class Settings(
     // Path file video iklan lokal. Kosong = pakai video bawaan (ad.mp4).
     val adVideoPath: String = "",
     // Current defaults schema. Fresh installs start here and skip legacy migrations.
-    val settingsSchema: Int = 4,
+    val settingsSchema: Int = 5,
 ) {
     /** Apply the current fresh-install playback defaults in one place. */
     internal fun applyCurrentDefaults(): Settings = copy(
         audioQuality = "HIGH",
-        normalizeVolume = true,
+        normalizeVolume = false,
         smartShuffle = true,
         gaplessPlayback = true,
         crossfadeSeconds = DEFAULT_CROSSFADE_SECONDS,
-        settingsSchema = 4,
+        settingsSchema = 5,
     )
 
     internal fun normalizeLegacyLtServerUrl() =
@@ -185,6 +187,12 @@ data class Settings(
                 s.premiumServerUrl
             }
             s = s.copy(premiumServerUrl = premiumServerUrl, settingsSchema = 4)
+        }
+        if (s.settingsSchema < 5) {
+            // Normalization was re-enabled by default for fresh installs, but users again
+            // experienced the per-track gain changes as the volume jumping up and down on
+            // its own. Same call as the 1.5.3 fix: keep it off unless the user opts in.
+            s = s.copy(normalizeVolume = false, settingsSchema = 5)
         }
         return s
     }

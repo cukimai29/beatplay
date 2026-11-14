@@ -645,6 +645,9 @@ object Player {
                 p.addListener(listener)
                 loadedId = song.id
                 loadedGeneration = gen
+                // A fresh engine defaults to full volume: set our level before the media
+                // starts so the first samples never pop at 100% before applyVolume() lands.
+                p.setVolume(currentVolume())
                 // start-paused avoids a burst of audio while a guest waits for the host's play message.
                 val accepted = p.load(mrl, headers, startPaused = !playWhenReady)
                 if (!accepted && currentLoad(p, song.id, gen)) onError(gen)

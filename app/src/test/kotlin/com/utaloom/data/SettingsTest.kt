@@ -23,12 +23,14 @@ class SettingsTest {
         val defaults = Settings()
         // A fresh install must skip the historical migrations that used to turn
         // these off, so the schema marker starts at the current default set.
-        assertEquals(4, defaults.settingsSchema)
+        assertEquals(5, defaults.settingsSchema)
         assertEquals("HIGH", defaults.audioQuality)
-        assertTrue(defaults.normalizeVolume)
+        // Normalization stays off by default: per-track level changes were experienced
+        // as the volume jumping up and down on its own between songs.
+        assertFalse(defaults.normalizeVolume)
         assertTrue(defaults.smartShuffle)
         assertTrue(defaults.gaplessPlayback)
-        assertEquals(2, defaults.crossfadeSeconds)
+        assertEquals(8, defaults.crossfadeSeconds)
     }
 
     @Test
@@ -113,16 +115,30 @@ class SettingsTest {
     @Test
     fun legacyVolumeAndBlurDefaultsAreResetOnce() {
         // Schema 0 installations use the historical defaults, so the old migration
-        // must still run for them even though fresh installs start at schema 4.
+        // must still run for them even though fresh installs start at schema 5.
         val legacy = Settings(normalizeVolume = true, backgroundBlurEnabled = true, settingsSchema = 0)
         val migrated = legacy.migrate()
         assertFalse(migrated.normalizeVolume)
         assertFalse(migrated.backgroundBlurEnabled)
-        assertEquals(4, migrated.settingsSchema)
+        assertEquals(5, migrated.settingsSchema)
 
         // A user who explicitly turns either option back on keeps that choice on later launches.
         val optedInAgain = migrated.copy(normalizeVolume = true, backgroundBlurEnabled = true)
         assertSame(optedInAgain, optedInAgain.migrate())
+    }
+
+    @Test
+    fun normalizationIsSwitchedOffForExistingInstalls() {
+        // Existing installs that kept the re-enabled default keep hearing the volume jump
+        // between tracks. The upgrade switches normalization off exactly once.
+        val legacy = Settings(normalizeVolume = true, settingsSchema = 4)
+        val migrated = legacy.migrate()
+        assertFalse(migrated.normalizeVolume)
+        assertEquals(5, migrated.settingsSchema)
+
+        // A user who explicitly opts back in keeps that choice on later launches.
+        val optedIn = migrated.copy(normalizeVolume = true)
+        assertSame(optedIn, optedIn.migrate())
     }
 
     @Test
@@ -133,7 +149,7 @@ class SettingsTest {
         val migrated = off.migrate()
         assertTrue(migrated.gaplessPlayback)
         assertTrue("The upgrade must pick a real blend, not a silent switch", migrated.crossfadeSeconds > 0)
-        assertEquals(4, migrated.settingsSchema)
+        assertEquals(5, migrated.settingsSchema)
 
         // A user who switches Automix back off keeps that choice on later launches.
         val offAgain = migrated.copy(gaplessPlayback = false, crossfadeSeconds = 0)
@@ -143,7 +159,7 @@ class SettingsTest {
         val seamless = Settings(gaplessPlayback = true, crossfadeSeconds = 0, settingsSchema = 1)
         val migratedSeamless = seamless.migrate()
         assertEquals(0, migratedSeamless.crossfadeSeconds)
-        assertEquals(4, migratedSeamless.settingsSchema)
+        assertEquals(5, migratedSeamless.settingsSchema)
 
         val blended = Settings(gaplessPlayback = true, crossfadeSeconds = 8, settingsSchema = 1)
         assertEquals(8, blended.migrate().crossfadeSeconds)

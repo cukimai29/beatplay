@@ -416,7 +416,12 @@ object ListenTogether : PlayerHooks {
             Player.seekTo(pos, fromRemote = true)
             if (playing) Player.play(fromRemote = true) else Player.pause(fromRemote = true)
         }
-        if (Stores.settings.value.ltSyncVolume && volume.isFinite() && volume >= 0) Player.setVolume((volume * 100).toInt(), fromRemote = true)
+        if (Stores.settings.value.ltSyncVolume && volume.isFinite() && volume >= 0) {
+            // Only sync when the host's volume actually changed, so periodic room-state
+            // updates don't re-apply the same value or stomp the guest's mute state.
+            val target = (volume * 100).toInt().coerceIn(0, 100)
+            if (Player.state.value.volume != target) Player.setVolume(target, fromRemote = true)
+        }
     }
 
     private fun onSyncPlayback(a: PlaybackActionPayload) {
