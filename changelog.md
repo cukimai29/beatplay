@@ -2,8 +2,14 @@
 
 ## [v1.4.2] - 2026-11-14
 
+### Fixed
+- **playback:** Media3 `PlaybackStatsListener` crash guarded (`SafeAnalyticsListener`) to prevent `IllegalArgumentException` on rapid stop/prepare/seek transitions.
+- **playback:** Disabled volume normalization by default and eliminated 20% transient focus ducking so audio volume does not fluctuate unexpectedly.
+
 ### Changed
 - **ads:** Free accounts now get one short ad break at a random 7–12 minute interval of listening time instead of after every 3 songs. The ad is queued after the current song so it never cuts a track in half, and it still shows for Premium-free listening when casting.
+- **playback:** Default Automix blend duration set to 8 seconds.
+- **brand:** New neon B icon across adaptive launcher, legacy mipmaps, monochrome icon, notification small icon, and in-app brand logos.
 - **premium:** The Premium screen shows the estimated minutes until the next break instead of a song counter.
 
 ## [v1.4.1] - 2026-11-14
