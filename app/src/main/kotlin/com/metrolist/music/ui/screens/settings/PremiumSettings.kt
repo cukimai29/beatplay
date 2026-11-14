@@ -64,6 +64,7 @@ import com.metrolist.music.constants.PremiumEmailKey
 import com.metrolist.music.constants.PremiumExpiryKey
 import com.metrolist.music.constants.PremiumServerUrlKey
 import com.metrolist.music.constants.AccountEmailKey
+import com.metrolist.music.constants.AccountNameKey
 import com.metrolist.music.constants.SongsSinceAdKey
 import com.metrolist.music.premium.AdState
 import com.metrolist.music.premium.ManualQris
@@ -98,6 +99,7 @@ fun PremiumSettingsScreen(
     DisposableEffect(api) { onDispose { api.close() } }
 
     var accountEmailPref by rememberPreference(AccountEmailKey, "")
+    var accountNamePref by rememberPreference(AccountNameKey, "")
     var isPremiumPref by rememberPreference(IsPremiumKey, false)
     var expiryPref by rememberPreference(PremiumExpiryKey, 0L)
     var songsPref by rememberPreference(SongsSinceAdKey, 0)
@@ -262,7 +264,11 @@ fun PremiumSettingsScreen(
 
             if (signedInEmail == null) {
                 Text(
-                    "Login YouTube/Google diperlukan agar email Premium terdeteksi otomatis.",
+                    if (accountNamePref.isBlank()) {
+                        "Login YouTube/Google diperlukan agar email Premium terdeteksi otomatis."
+                    } else {
+                        "Channel ini tidak menyertakan email. Buka \"Ganti Youtube channel\" lalu pilih akun Google pemiliknya agar Premium terdeteksi."
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )

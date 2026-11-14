@@ -67,6 +67,7 @@ import com.metrolist.music.LocalPlayerAwareWindowInsets
 import com.metrolist.music.R
 import com.metrolist.music.constants.AccountChannelHandleKey
 import com.metrolist.music.constants.AccountEmailKey
+import com.metrolist.music.premium.resolveAccountEmail
 import com.metrolist.music.constants.AccountNameKey
 import com.metrolist.music.constants.DataSyncIdKey
 import com.metrolist.music.constants.InnerTubeAuthUserKey
@@ -187,6 +188,13 @@ fun LoginScreen(
 
         try {
             val accountInfo = YouTube.accountInfo().getOrThrow()
+            // A brand channel has no email in the account menu, so borrow the owner address from
+            // the channel list. Premium stays bound to the signed-in Google account either way.
+            val channelAccounts =
+                withTimeoutOrNull(8_000) {
+                    YouTube.accountsList().getOrDefault(emptyList())
+                }.orEmpty()
+            val ownerEmail = resolveAccountEmail(accountInfo, channelAccounts).orEmpty()
             val saved =
                 withContext(Dispatchers.IO) {
                     context.safeDataStoreEdit { settings ->
@@ -195,7 +203,7 @@ fun LoginScreen(
                         settings[DataSyncIdKey] = authData.dataSyncId
                         settings[InnerTubeAuthUserKey] = authData.authUser
                         settings[AccountNameKey] = accountInfo.name
-                        settings[AccountEmailKey] = accountInfo.email.orEmpty()
+                        settings[AccountEmailKey] = ownerEmail
                         settings[AccountChannelHandleKey] = accountInfo.channelHandle.orEmpty()
                     }
                 }

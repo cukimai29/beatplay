@@ -42,6 +42,7 @@ import com.metrolist.music.utils.reportException
 import com.metrolist.music.premium.PremiumApi
 import com.metrolist.music.premium.isValidPremiumEmail
 import com.metrolist.music.premium.normalizePremiumEmail
+import com.metrolist.music.premium.resolveAccountEmail
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -52,6 +53,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import okhttp3.Credentials
 import okhttp3.OkHttpClient
 import timber.log.Timber
@@ -240,14 +242,47 @@ class App :
         }
     }
 
+    private data class AccountEmailLookup(val email: String?, val available: Boolean)
+
+    /**
+     * Older installs (and brand channels signed in before 1.4.1) stored no email. Rebuild the
+     * owner address from the account menu plus the channel list when possible.
+     */
+    private suspend fun resolveSignedInAccountEmail(
+        settings: androidx.datastore.preferences.core.Preferences,
+    ): AccountEmailLookup {
+        val storedCookie = settings[InnerTubeCookieKey]
+        if (storedCookie.isNullOrBlank() || YouTube.cookie.isNullOrBlank()) {
+            return AccountEmailLookup(null, available = true)
+        }
+        val account = runCatching {
+            withTimeout(12_000) { YouTube.accountInfo().getOrThrow() }
+        }.getOrNull() ?: return AccountEmailLookup(null, available = false)
+        val accounts = runCatching {
+            withTimeout(12_000) { YouTube.accountsList().getOrThrow() }
+        }.getOrDefault(emptyList())
+        return AccountEmailLookup(resolveAccountEmail(account, accounts), available = true)
+    }
+
     /**
      * Premium belongs to the Google/YouTube account saved by the app, never to an email typed
      * on the Premium screen. A failed network request leaves the previously known status intact.
      */
     private suspend fun refreshPremiumForSignedInAccount(settings: androidx.datastore.preferences.core.Preferences) {
-        val accountEmail = settings[AccountEmailKey]
+        var accountEmail = settings[AccountEmailKey]
             ?.let(::normalizePremiumEmail)
             ?.takeIf(::isValidPremiumEmail)
+        if (accountEmail == null) {
+            val lookup = resolveSignedInAccountEmail(settings)
+            if (lookup.email != null) {
+                accountEmail = lookup.email
+                safeDataStoreEdit { prefs -> prefs[AccountEmailKey] = lookup.email }
+            } else if (!lookup.available) {
+                // Signed in but the account menu could not be read (offline). Keep the cached
+                // entitlement instead of silently dropping it.
+                return
+            }
+        }
         if (accountEmail == null) {
             safeDataStoreEdit { prefs ->
                 prefs[IsPremiumKey] = false

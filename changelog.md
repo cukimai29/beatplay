@@ -1,5 +1,11 @@
 # Changelog
 
+## [v1.4.1] - 2026-11-14
+
+### Fixed
+- **premium:** Brand channels (for example "rzkyy ads") report no email, so Premium looked inactive after switching accounts. The app now reads the owner email from the channel list, and older installs rebuild the missing email automatically at startup.
+- **premium:** A temporary network failure while reading the account menu no longer clears a Premium status that was already confirmed.
+
 ## [v1.4.0] - 2026-11-14
 
 ### Changed
