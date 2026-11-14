@@ -12,7 +12,7 @@ Link APK ada di `download.html` dan mengarah langsung ke GitHub Release:
 - `ANDROID_APK_SIZE` — ukuran yang ditampilkan
 
 APK resmi saat ini:
-`https://github.com/cukimai29/beatplay/releases/download/android-v1.3.2/BeatPlay-1.3.2-android.apk`
+`https://github.com/cukimai29/beatplay/releases/download/android-v1.4.0/BeatPlay-1.4.0-android.apk`
 
 Jika ada APK baru, unggah ke release `android-v*`, lalu ganti tiga konstanta
 tersebut di `download.html`. CSS dan HTML perlu disalin ke `BeatPlay-website/`
