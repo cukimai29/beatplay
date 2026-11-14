@@ -1,25 +1,22 @@
 """Render the BeatPlay brand mark into the Android launcher resources.
 
-The design is the same one used by the desktop app, website and promo art
-(``D:\\musik\\make_logo.py``): the neon "B" emblem from ``tools/logobaru.jpeg``,
-a 1536x1536 square with the emblem above the "BeatPlay" wordmark. Keeping the
-source file in this repo means the launcher icons can be regenerated without a
-desktop checkout.
+The design is the same one used by the desktop app (``D:\\musik\\make_logo.py``):
+the neon "B" emblem. The current source (``tools/iconv2.jpeg``) is a 2048x2048
+square with the emblem centred on its dark background and no wordmark, so the
+whole canvas is the emblem tile. The previous wordmark artwork is kept as
+``tools/logobaru.jpeg`` for reference.
 
 Run:  python tools/make_icons.py
 """
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageDraw
+from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
 RES = ROOT / "app" / "src" / "main" / "res"
-SOURCE = ROOT / "tools" / "logobaru.jpeg"
+SOURCE = ROOT / "tools" / "iconv2.jpeg"
 
-# Center the visible emblem, including its glow. The source canvas includes
-# empty space above the mark and the wordmark below it, so a full top crop
-# makes the launcher icon look vertically low.
-EMBLEM_CROP = (285, 150, 1305, 1170)
+# The new artwork is a full-canvas square emblem; no crop needed.
 TILE_RADIUS_RATIO = 0.225
 MASTER_SIZE = 1024
 
@@ -31,11 +28,24 @@ DENSITIES = {
     "xxxhdpi": 192,
 }
 
+# The notification / status-bar mark renders at 24dp.
+NOTIF_DENSITIES = {
+    "mdpi": 24,
+    "hdpi": 36,
+    "xhdpi": 48,
+    "xxhdpi": 72,
+    "xxxhdpi": 96,
+}
+
+
+def emblem() -> Image.Image:
+    """The square emblem artwork as RGBA."""
+    return Image.open(SOURCE).convert("RGBA")
+
 
 def rounded_tile(size: int) -> Image.Image:
     """The emblem tile with transparent rounded corners (legacy launcher icons)."""
-    src = Image.open(SOURCE).convert("RGB").crop(EMBLEM_CROP)
-    tile = src.resize((size, size), Image.LANCZOS).convert("RGBA")
+    tile = emblem().resize((size, size), Image.LANCZOS)
     mask = Image.new("L", (size, size), 0)
     ImageDraw.Draw(mask).rounded_rectangle(
         [0, 0, size - 1, size - 1],
@@ -59,33 +69,24 @@ def adaptive_foreground(size: int) -> Image.Image:
     """Full-bleed emblem tile; the launcher mask decides the visible shape.
 
     The tile keeps its own transparent rounded corners, and the background
-    gradient matches its near-black fill, so circle/rounded/squircle masks all
+    gradient matches its dark fill, so circle/rounded/squircle masks all
     crop the same artwork instead of letterboxing it inside a small square.
     """
-    src = Image.open(SOURCE).convert("RGB").crop(EMBLEM_CROP)
-    mark = src.resize((size, size), Image.LANCZOS).convert("RGBA")
-    mask = Image.new("L", (size, size), 0)
-    ImageDraw.Draw(mask).rounded_rectangle(
-        [0, 0, size - 1, size - 1],
-        radius=int(size * TILE_RADIUS_RATIO),
-        fill=255,
-    )
-    mark.putalpha(mask)
-    return mark
+    return rounded_tile(size)
 
 
 def monochrome(size: int) -> Image.Image:
-    """Themed-icon silhouette: solid white emblem, no glow."""
-    src = Image.open(SOURCE).convert("RGB").crop(EMBLEM_CROP)
-    width = int(size * 0.80)
-    height = round(width * src.height / src.width)
-    grey = src.resize((width, height), Image.LANCZOS).convert("L")
-    mask = grey.point(lambda v: 255 if v >= 96 else 0).convert("L")
-    mark = Image.new("RGBA", (width, height), (255, 255, 255, 0))
+    """Themed-icon silhouette: solid white emblem, no glow.
+
+    The background of the artwork sits around grey 35 and the faint halo fades
+    out below grey 78, so a ramp between 78 and 102 keeps the core of the mark
+    with smooth edges and drops the glow.
+    """
+    src = emblem().convert("L").resize((size, size), Image.LANCZOS)
+    mask = src.point(lambda v: max(0, min(255, round((v - 78) * 255 / 24))))
+    mark = Image.new("RGBA", (size, size), (255, 255, 255, 0))
     mark.putalpha(mask)
-    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    canvas.alpha_composite(mark, ((size - mark.width) // 2, (size - mark.height) // 2))
-    return canvas
+    return mark
 
 
 def main() -> None:
@@ -113,6 +114,12 @@ def main() -> None:
     nodpi = RES / "drawable-nodpi"
     nodpi.mkdir(parents=True, exist_ok=True)
     master.resize((512, 512), Image.LANCZOS).save(nodpi / "app_logo.png", optimize=True)
+
+    # Notification / status-bar mark: white silhouette at every density.
+    for density, size in NOTIF_DENSITIES.items():
+        folder = RES / f"drawable-{density}"
+        folder.mkdir(parents=True, exist_ok=True)
+        mono.resize((size, size), Image.LANCZOS).save(folder / "small_icon.png", optimize=True)
 
     print("Android icons regenerated in", RES)
 
