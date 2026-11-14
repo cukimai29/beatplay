@@ -76,11 +76,39 @@ fun applySession() {
                 com.utaloom.premium.PremiumRepository.refresh(accountEmail, s.premiumServerUrl)
             }
         }.start()
+    } else if (s.cookie != null) {
+        // Sessions saved before this fix (or brand channels, which show no email in the account
+        // menu) have no address stored. Rebuild it from the channel list instead of losing premium.
+        Thread {
+            kotlinx.coroutines.runBlocking {
+                val resolved = resolveSessionAccountEmail()
+                if (resolved != null) {
+                    Stores.settings.update { it.copy(accountEmail = resolved) }
+                    if (Stores.settings.value.premiumEmail?.trim()?.lowercase() != resolved) {
+                        Stores.settings.update {
+                            it.copy(isPremium = false, premiumEmail = resolved, premiumExpiry = null, songsSinceAd = 0)
+                        }
+                    }
+                    com.utaloom.premium.PremiumRepository.refresh(resolved, s.premiumServerUrl)
+                }
+            }
+        }.start()
     } else if (s.isPremium || s.premiumEmail != null) {
         Stores.settings.update {
             it.copy(isPremium = false, premiumEmail = null, premiumExpiry = null, songsSinceAd = 0)
         }
     }
+}
+
+/** Owner address of the signed-in account, using the channel list when the menu omits it. */
+private suspend fun resolveSessionAccountEmail(): String? = withContext(Dispatchers.IO) {
+    val account = withTimeoutOrNull(15_000) {
+        runCatching { YouTube.accountInfo().getOrThrow() }.getOrNull()
+    } ?: return@withContext null
+    val accounts = withTimeoutOrNull(15_000) {
+        runCatching { YouTube.accountsList().getOrThrow() }.getOrDefault(emptyList())
+    }.orEmpty()
+    com.utaloom.premium.resolveAccountEmail(account, accounts)
 }
 
 private enum class Panel { NONE, QUEUE, LYRICS }

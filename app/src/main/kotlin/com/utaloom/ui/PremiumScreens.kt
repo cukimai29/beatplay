@@ -72,7 +72,14 @@ fun PremiumSection() {
             }
         }
         if (email.isBlank() || !isValidEmail(email)) {
-            Text("Login YouTube/Google diperlukan agar email Premium terdeteksi otomatis.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            Text(
+                if (s.accountName.isNullOrBlank()) {
+                    "Login YouTube/Google diperlukan agar email Premium terdeteksi otomatis."
+                } else {
+                    "Channel ini tidak menyertakan email. Login ulang dengan akun Google pemiliknya agar Premium terdeteksi."
+                },
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error,
+            )
         } else {
             Text("Akun login: $email", style = MaterialTheme.typography.bodyMedium)
         }
@@ -182,7 +189,7 @@ fun BuyPremiumSection() {
         val emailOk = s.accountEmail?.let(::isValidEmail) == true
         if (!emailOk) Text("Login YouTube/Google dulu untuk membeli Premium.", style = MaterialTheme.typography.bodySmall)
         Button({
-            val email = s.premiumEmail ?: return@Button
+            val email = s.accountEmail?.trim()?.lowercase()?.takeIf(::isValidEmail) ?: return@Button
             val plan = selected ?: return@Button
             busy = true; statusMsg = "Membuat order…"
             scope.launch {

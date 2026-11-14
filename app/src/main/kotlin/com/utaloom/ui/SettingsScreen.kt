@@ -29,6 +29,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import java.net.URI
 import java.util.Locale
 
@@ -61,8 +62,14 @@ private suspend fun signInWithCookie(cookie: String) {
         val account = withTimeout(30_000) { withContext(Dispatchers.IO) { YouTube.accountInfo().getOrThrow() } }
         currentCoroutineContext().ensureActive()
         check(account.name.isNotBlank())
+        // A brand channel has no email in the account menu; borrow the owner address from the
+        // channel list so premium stays bound to the signed-in Google account.
+        val channelAccounts = withTimeoutOrNull(15_000) {
+            withContext(Dispatchers.IO) { YouTube.accountsList().getOrDefault(emptyList()) }
+        }.orEmpty()
+        val ownerEmail = com.utaloom.premium.resolveAccountEmail(account, channelAccounts)
         Stores.settings.update { it.copy(cookie = cookie, visitorData = YouTube.visitorData, dataSyncId = YouTube.dataSyncId,
-            accountName = account.name, accountEmail = account.email, accountAvatar = account.thumbnailUrl) }
+            accountName = account.name, accountEmail = ownerEmail, accountAvatar = account.thumbnailUrl) }
         saved = true
     } finally {
         YouTube.useLoginForBrowse = oldUseLogin
