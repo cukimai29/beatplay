@@ -106,7 +106,7 @@ fun PlayerSettings(
     )
     val (crossfadeDuration, onCrossfadeDurationChange) = rememberPreference(
         CrossfadeDurationKey,
-        defaultValue = 2f
+        defaultValue = 8f
     )
     val (crossfadeGapless, onCrossfadeGaplessChange) = rememberPreference(
         CrossfadeGaplessKey,
@@ -124,9 +124,11 @@ fun PlayerSettings(
         SkipSilenceInstantKey,
         defaultValue = false
     )
+    // Off by default: per-track gain changes were experienced as the volume jumping
+    // up and down on its own between songs. Users who want it can opt in here.
     val (audioNormalization, onAudioNormalizationChange) = rememberPreference(
         AudioNormalizationKey,
-        defaultValue = true
+        defaultValue = false
     )
 
     val (loudnessLevel, onLoudnessLevelChange) = rememberEnumPreference(

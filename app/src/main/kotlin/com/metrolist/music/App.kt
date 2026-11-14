@@ -138,14 +138,14 @@ class App :
         val languageTag = locale.language
 
         // BeatPlay 1.3.0: "Crossfade" is now "Automix" and ships enabled at
-        // 2 seconds, matching the desktop app. Migrate once so installs that
+        // 8 seconds, matching the desktop app. Migrate once so installs that
         // explicitly disabled the old option also get the new default; keep a
         // duration the user chose themselves.
         if (settings[CrossfadeDefaultsMigratedKey] != true) {
             val migrated = safeDataStoreEdit { prefs ->
                 prefs[CrossfadeEnabledKey] = true
                 if (!prefs.contains(CrossfadeDurationKey)) {
-                    prefs[CrossfadeDurationKey] = 2f
+                    prefs[CrossfadeDurationKey] = 8f
                 }
                 prefs[CrossfadeDefaultsMigratedKey] = true
             }

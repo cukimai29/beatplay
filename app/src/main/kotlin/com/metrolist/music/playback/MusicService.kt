@@ -993,7 +993,7 @@ class MusicService :
         combine(
             currentFormat,
             dataStore.data
-                .map { it[AudioNormalizationKey] ?: true }
+                .map { it[AudioNormalizationKey] ?: false }
                 .distinctUntilChanged(),
             dataStore.data
                 .map { prefs -> prefs[LoudnessLevelKey].toEnum(LoudnessLevel.BALANCED) }
@@ -1216,7 +1216,7 @@ class MusicService :
             dataStore.data.map { prefs ->
                 Triple(
                     prefs[CrossfadeEnabledKey] ?: true,
-                    prefs[CrossfadeDurationKey] ?: 2f,
+                    prefs[CrossfadeDurationKey] ?: 8f,
                     prefs[CrossfadeGaplessKey] ?: true,
                 )
             },
@@ -1483,7 +1483,7 @@ class MusicService :
                 }
             }
         }
-        player.addAnalyticsListener(PlaybackStatsListener(false, this@MusicService))
+        player.addAnalyticsListener(SafeAnalyticsListener(PlaybackStatsListener(false, this@MusicService)))
 
         // Cleanup handled manually in onDestroy/release
         _playerFlow.value = player
@@ -1554,12 +1554,11 @@ class MusicService :
             }
 
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                // No ducking: notifications and system sounds must not make the music
+                // volume suddenly drop and come back ("volume changes on its own").
+                // Keep playing at the current level.
                 hasAudioFocus = false
-                audioFocusVolumeMultiplier.value = 0.2f
                 wasPlayingBeforeAudioFocusLoss = player.isPlaying
-                if (player.isPlaying) {
-                    applyEffectiveVolume()
-                }
                 lastAudioFocusState = focusChange
             }
 
@@ -2557,7 +2556,7 @@ class MusicService :
 
     private fun seedLoudnessCacheFromPrefs() {
         val prefs = startupPrefs!!
-        normalizationEnabledCached = prefs[AudioNormalizationKey] ?: true
+        normalizationEnabledCached = prefs[AudioNormalizationKey] ?: false
         loudnessLevelCached = prefs[LoudnessLevelKey].toEnum(LoudnessLevel.BALANCED)
 
         Timber.tag(TAG).d(
@@ -5604,4 +5603,25 @@ internal fun normalizationGainMb(
     return measuredLufs
         ?.let { (-(it - targetLufs) * 100.0).toInt() }
         ?.coerceIn(-1500, 300)
+}
+
+/**
+ * media3's [PlaybackStatsListener] crashes with IllegalArgumentException when player events
+ * arrive out of order (androidx/media#1133): PlaybackStatsTracker.updatePlaybackState asserts
+ * `eventTime.realtimeMs >= currentPlaybackStateStartTimeMs`, which our frequent
+ * stop()/prepare()/seekTo() cycles (crossfade, offline mode, ad breaks) can violate.
+ * Analytics must never take playback down, so route the single [AnalyticsListener.onEvents]
+ * entry point through a guard.
+ */
+@UnstableApi
+private class SafeAnalyticsListener(
+    private val delegate: AnalyticsListener,
+) : AnalyticsListener {
+    override fun onEvents(player: Player, events: AnalyticsListener.Events) {
+        try {
+            delegate.onEvents(player, events)
+        } catch (e: Exception) {
+            Timber.tag("MusicService").w(e, "Ignored PlaybackStatsListener exception")
+        }
+    }
 }
